@@ -134,14 +134,17 @@ class Token(EmptyObject):
     def is_term(self):
         return self.category == TokenCategory.Term
 
+    def __str__(self):
+        return f"Token {self.type} @ {self.span}"
+
     def __repr__(self):
         return f"Token({self._type.value}, {repr(self._value)}, {repr(self._span)})"
 
     def __eq__(self, other):
-        if isinstance(other, str):
-            return self._value == other
-        elif isinstance(other, TokenType):
+        if isinstance(other, TokenType):
             return self._type == other
+        if isinstance(other, (String, str)):
+            return self._value == other
         else:
             raise TypeError(f"Can't compare between types: {Token} and {type(other)}")
 

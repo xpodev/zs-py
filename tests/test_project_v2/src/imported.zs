@@ -1,0 +1,3 @@
+fun imported() {
+    imported(Main)
+}

@@ -30,6 +30,9 @@ class DocumentInfo(EmptyObject):
     def path_string(self):
         return str(self._path)
 
+    def __str__(self):
+        return f"Document @ {self.path}"
+
 
 class SourceFile(EmptyObject):
     _info: DocumentInfo
@@ -56,6 +59,9 @@ class SourceFile(EmptyObject):
     def from_path(cls, path: str | Path, mode: Literal['t'] | Literal['b'] = 't'):
         with open(str(path), mode + 'r') as source:
             return cls(DocumentInfo(path), (io.StringIO if mode == 't' else io.BytesIO)(source.read()))
+
+    def __str__(self):
+        return f"SourceFile @ {self._info.path}"
 
 
 class Position(EmptyObject):
@@ -126,6 +132,9 @@ class Span(EmptyObject):
     @property
     def text(self):
         return self._text
+
+    def __str__(self):
+        return f"Span: {self._start} -> {self._end} [{self._text}]"
 
     def __repr__(self):
         return f"Span({repr(self._start)}, {repr(self._end)}, text=[{self._text}])"

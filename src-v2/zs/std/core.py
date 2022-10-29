@@ -20,7 +20,7 @@ __all__ = [
     "Parameter",
     "Property",
     "String",
-    "Type",
+    "Class",
 ]
 
 
@@ -38,4 +38,4 @@ core.add(zs_type(Module), export=True)
 core.add(zs_type(Parameter), export=True)
 core.add(zs_type(Property), export=True)
 core.add(zs_type(String), export=True)
-core.add(zs_type(Type), export=True)
+core.add(zs_type(Class), export=True)

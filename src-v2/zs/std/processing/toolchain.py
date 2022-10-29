@@ -1,14 +1,16 @@
-from zs.processing import StatefulProcessor, State, Context
-from zs.std.objects.compilation_environment import Document
+from pathlib import Path
+
+from zs.processing import StatefulProcessor, State
+from zs.std.objects.compilation_environment import Document, ContextManager
 from zs.std.processing.interpreter import Interpreter
-from zs.text.file_info import SourceFile
+from zs.text.file_info import SourceFile, DocumentInfo
 from zs.text.parser import Parser
 from zs.text.token_stream import TokenStream
 from zs.text.tokenizer import Tokenizer
 
 
 class Toolchain(StatefulProcessor):
-    _context: Context
+    _context: ContextManager
     _tokenizer: Tokenizer
     _parser: Parser
     _interpreter: Interpreter
@@ -17,13 +19,13 @@ class Toolchain(StatefulProcessor):
             self,
             *,
             state: State = None,
-            context: Context = None,
+            context: ContextManager = None,
             tokenizer: Tokenizer = None,
             parser: Parser = None,
             interpreter: Interpreter = None
     ):
         super().__init__(state or State())
-        self._context = context or Context()
+        self._context = context or ContextManager()
         self._tokenizer = tokenizer or Tokenizer(state=self.state)
         self._parser = parser or Parser(state=self.state)
         self._interpreter = interpreter or Interpreter(state=state, context=context)
@@ -40,13 +42,24 @@ class Toolchain(StatefulProcessor):
     def interpreter(self):
         return self._interpreter
 
-    def compile_document(self, file: SourceFile) -> Document:
-        token_generator = self._tokenizer.tokenize(file)
+    def compile_document(self, path: Path) -> Document:
+        super().run()
 
-        token_stream = TokenStream(token_generator)
+        path = path.resolve()
+        info = DocumentInfo(path)
 
-        document = Document(self._parser.parse(token_stream))
+        if (nodes := self._context.get_nodes_from_cached(str(path))) is None:
+            file = SourceFile.from_path(path)
 
-        self._interpreter.execute_document(document.nodes)
+            token_generator = self._tokenizer.tokenize(file)
 
-        return document
+            token_stream = TokenStream(token_generator)
+
+            nodes = self._parser.parse(token_stream)
+
+        document = Document(info, nodes)
+
+        with self._context.document(document):
+            self._interpreter.execute_document(document.nodes)
+
+            return document

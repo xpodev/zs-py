@@ -65,7 +65,7 @@ class State(EmptyObject):
         self.message(MessageType.Info, message, origin)
 
     def message(self, message_type: MessageType, message: str | String, origin: Object = None):
-        self._cache.add(Message(message_type, String(message), origin))
+        self._messages.add(Message(message_type, String(message), origin))
 
     def reset(self):
         self._processor = None
@@ -96,42 +96,42 @@ class StatefulProcessor(EmptyObject):
         self._state.run(self)
 
 
-class Context(EmptyObject):
-    _items: dict[str, Object]
-    _parent: Optional["Context"]
-
-    def __init__(self, parent: Optional["Context"] = None, **items: Object):
-        super().__init__()
-        self._items = items
-        self._parent = parent
-
-    @property
-    def items(self):
-        return self._items.items()
-
-    def add(self, value: Object, name: str | String = None):
-        name = name or getattr(value, "name")
-        if name is None:
-            raise TypeError(f"Can't add an unnamed object to the context")
-        name = str(name)
-        if name in self._items:
-            self._items[name] += value
-        else:
-            self._items[name] = value
-
-    def get(self, name: str | String):
-        try:
-            return self._items[str(name)]
-        except KeyError:
-            if self._parent is not None:
-                return self._parent.get(name)
-            raise
-
-    def set(self, name: str | String, value: Object):
-        name = str(name)
-        if name not in self._items:
-            if self._parent is None:
-                raise ValueError(f"Could not find name \"{name}\"")
-            self._parent.set(name, value)
-        else:
-            self._items[name] = value
+# class Context(EmptyObject):
+#     _items: dict[str, Object]
+#     _parent: Optional["Context"]
+#
+#     def __init__(self, parent: Optional["Context"] = None, **items: Object):
+#         super().__init__()
+#         self._items = items
+#         self._parent = parent
+#
+#     @property
+#     def items(self):
+#         return self._items.items()
+#
+#     def add(self, value: Object, name: str | String = None):
+#         name = name or getattr(value, "name")
+#         if name is None:
+#             raise TypeError(f"Can't add an unnamed object to the context")
+#         name = str(name)
+#         if name in self._items:
+#             self._items[name] += value
+#         else:
+#             self._items[name] = value
+#
+#     def get(self, name: str | String):
+#         try:
+#             return self._items[str(name)]
+#         except KeyError:
+#             if self._parent is not None:
+#                 return self._parent.get(name)
+#             raise
+#
+#     def set(self, name: str | String, value: Object):
+#         name = str(name)
+#         if name not in self._items:
+#             if self._parent is None:
+#                 raise KeyError(f"Could not find name \"{name}\"")
+#             self._parent.set(name, value)
+#         else:
+#             self._items[name] = value

@@ -1,22 +1,41 @@
-from zs.std import Type
+from typing import Callable
+
+from zs import Object
 
 
-__all__ = [
-    "zs_type",
-]
+class ResolveOnDemand:
+    _resolver: Callable[[Object], Object]
+
+    def __init__(self, original: property, name: str = None):
+        self._original = original
+        self._name = name
+
+    def __get__(self, instance, owner):
+        setattr(instance, self._name, self.resolve(getattr(instance, self._name)))
+        setattr(owner, self._original_name, self._original)
+        return self._original.__get__(instance, owner)
+
+    def __set_name__(self, owner, name):
+        self._original_name = name
+        self._name = self._name or '_' + name
+
+    @classmethod
+    def resolve(cls, o: Object):
+        return cls._resolver(o)
+
+    @classmethod
+    def resolver(cls, resolver: Callable[[Object], Object] = None):
+        if resolver is None:
+            return cls._resolver
+        cls._resolver = resolver
 
 
-def zs_type(cls_or_none=None, *, name: str = None):
-    def _internal(cls):
-        if not isinstance(cls, type):
-            raise TypeError(f"The 'zs_type' decorator can only be applied to types, not '{type(cls)}'")
+def resolve_on_demand(name_or_property: str | property):
+    name = name_or_property if isinstance(name_or_property, str) else None
 
-        result = Type()
+    def wrapper(prop: property):
+        return ResolveOnDemand(prop, name)
 
-        result.name = name or cls.__name__
-
-        return result
-
-    if cls_or_none is not None:
-        return _internal(cls_or_none)
-    return _internal
+    if isinstance(name_or_property, property):
+        return wrapper(name_or_property)
+    return wrapper

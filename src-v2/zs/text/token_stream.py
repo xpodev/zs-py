@@ -40,7 +40,7 @@ class TokenStream(EmptyObject):
     def peek(self, next_: int = 0) -> Token:
         return self._tokens[self._current + next_]
 
-    def seek(self, pos: int, mode: SeekMode.Current):
+    def seek(self, pos: int, mode: SeekMode = SeekMode.Current):
         if mode == SeekMode.Start:
             self._current = pos
         elif mode == SeekMode.Current:
@@ -63,16 +63,16 @@ class TokenStream(EmptyObject):
     @contextmanager
     def save_position(self):
         position = self._current
-        state = type('', (object,), {'__restore': True})()
-        state.commit = lambda: setattr(state, "__restore", False)
+        state = type("", (object,), {"__restore__": True, "restore": None})()
+        state.commit = lambda: setattr(state, "__restore__", False)
 
         def restore():
-            state.__restore = False
+            state.__restore__ = False
             self._current = position
 
         state.restore = restore
         try:
             yield state
         finally:
-            if state.__restore:
+            if state.__restore__:
                 self._current = position

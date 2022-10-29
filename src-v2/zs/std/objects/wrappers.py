@@ -74,6 +74,7 @@ class Bool(NativeValue):
         return self._native
 
 
+# @zs_type
 class Int32(NativeValue):
     _native: int
 
@@ -98,6 +99,9 @@ class Int32(NativeValue):
 
     def __lt__(self, other: Union[int, "Int32"]) -> Bool:
         return Bool(int(self) < int(other))
+
+    def __gt__(self, other):
+        return Bool(int(self) > int(other))
 
     def __eq__(self, other):
         return Bool(int(self) == int(other))
@@ -137,8 +141,14 @@ class List(NativeValue, Generic[_T]):
         else:
             self._items.pop(index)
 
+    def __iter__(self):
+        return iter(self._items)
+
     def __getitem__(self, index: Int32):
         return self._items[int(index)]
+
+    def __len__(self):
+        return len(self._items)
 
 
 class Dictionary(NativeValue, Generic[_KT, _VT]):
@@ -165,6 +175,9 @@ class Dictionary(NativeValue, Generic[_KT, _VT]):
         if default is _SINGULARITY:
             return self._items.get(key)
         return self._items.get(key, default)
+
+    def values(self):
+        return self._items.values()
 
     def __contains__(self, key: _KT):
         return Bool(key in self._items)

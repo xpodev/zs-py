@@ -119,7 +119,7 @@ class Tokenizer(StatefulProcessor):
             case '.' | '/' | '|' | '+' | '-' | '=' | '<' | '>' | '!' | '@' | '#' | '$' | '%' | '^' | '&' | '*' | '~' | '?':
                 if char == '/' and self._stream.peek() == '/':
                     comment = ""
-                    while (c := self._stream.read(1)) != '\n':
+                    while (c := self._stream.read(1)) != '\n' and not self._stream.eof():
                         comment += c
                     return self._token(TokenType.LineComment, comment)
                 else:
