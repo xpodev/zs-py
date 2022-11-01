@@ -63,3 +63,7 @@ class SetLocal(Object[node_lib.Expression]):
     @property
     def value(self):
         return self._value
+
+
+# todo: Instead if setlocal having the value as parameter, pop it from the stack
+# the interpreter should be implemented as a stack machine
