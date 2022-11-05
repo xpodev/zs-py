@@ -1,8 +1,11 @@
 from pathlib import Path
 
+from zs.ctrt.context import Scope
+from zs.ctrt.interpreter import Interpreter
+from zs.ctrt.pp import Preprocessor
 from zs.processing import StatefulProcessor, State
 from zs.std.objects.compilation_environment import Document, ContextManager
-from zs.std.processing.interpreter import Interpreter
+# from zs.std.processing.interpreter import Interpreter
 from zs.text.file_info import SourceFile, DocumentInfo
 from zs.text.parser import Parser
 from zs.text.token_stream import TokenStream
@@ -28,7 +31,8 @@ class Toolchain(StatefulProcessor):
         self._context = context or ContextManager()
         self._tokenizer = tokenizer or Tokenizer(state=self.state)
         self._parser = parser or Parser(state=self.state)
-        self._interpreter = interpreter or Interpreter(state=state, context=context)
+        # self._interpreter = interpreter or Interpreter(state=state, context=context)
+        self._interpreter = interpreter or Interpreter(self.state)
 
     @property
     def tokenizer(self):
@@ -41,6 +45,10 @@ class Toolchain(StatefulProcessor):
     @property
     def interpreter(self):
         return self._interpreter
+
+    @property
+    def gcs(self):
+        return self._global
 
     def compile_document(self, path: Path) -> Document:
         super().run()
@@ -59,7 +67,13 @@ class Toolchain(StatefulProcessor):
 
         document = Document(info, nodes)
 
-        with self._context.document(document):
-            self._interpreter.execute_document(document.nodes)
+        with self._context.document(document), self._interpreter.x.scope():
+            # self._interpreter.execute_document(document.nodes)
+
+            preprocessor = Preprocessor(self.state)
+
+            pp = list(map(preprocessor.preprocess, nodes))
+
+            result = list(map(self._interpreter.execute, pp))
 
             return document

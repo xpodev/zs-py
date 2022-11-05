@@ -8,6 +8,7 @@ _T = TypeVar("_T")
 __all__ = [
     "EmptyObject",
     "Object",
+    "NativeFunction"
 ]
 
 

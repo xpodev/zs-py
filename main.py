@@ -3,13 +3,13 @@ from typing import Callable
 
 from zs.base import NativeFunction
 from zs.cli.options import Options, get_options
+from zs.ctrt.lib import Function, ExObj
 from zs.processing import State, StatefulProcessor
 from zs.std import Int32
 from zs.std.importers import ZSImporter
 from zs.std.objects.compilation_environment import Document, ContextManager
 from zs.std.parsers.std import get_standard_parser
 from zs.std.processing.toolchain import Toolchain
-from zs.text.file_info import SourceFile
 
 
 class Compiler(StatefulProcessor):
@@ -59,6 +59,16 @@ def main(options: Options):
     import_system.add_directory("./tests/test_project_v2/")
 
     import_system.add_importer(ZSImporter(import_system, compiler), ".zs")
+
+    compiler.toolchain.interpreter.x.local("__srf__", compiler)
+    compiler.toolchain.interpreter.x.local("_._", NativeFunction(lambda o, n: getattr(o, str(n))))
+    compiler.toolchain.interpreter.x.local("Function", Function)
+    compiler.toolchain.interpreter.x.local("Object", ExObj)
+    compiler.toolchain.interpreter.x.local("getattr", NativeFunction(lambda o, n: getattr(o, str(n))))
+    compiler.toolchain.interpreter.x.local("setattr", NativeFunction(lambda o, n, v: setattr(o, str(n), v)))
+    compiler.toolchain.interpreter.x.local("print", NativeFunction(lambda *args, **kwargs: print(*args, **{
+        n: compiler.toolchain.interpreter.execute(value) for n, value in kwargs.items()
+    })))
 
     context.add(NativeFunction(lambda o, n, v: setattr(o, str(n), v)), "setattr")
     context.add(NativeFunction(lambda o, n: getattr(o, str(n))), "getattr")

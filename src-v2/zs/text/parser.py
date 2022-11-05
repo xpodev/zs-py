@@ -207,6 +207,8 @@ class Parser(StatefulProcessor):
             if not isinstance(parser, ContextualParser):
                 parser = parser(self.state)
             self._context_parsers[type_or_name] = parser
+            if isinstance(type_or_name, type):
+                self._context_parsers[String(type_or_name.__name__)] = parser
         except ValueError:
             parser, = args
             if isinstance(parser, ContextualParser):

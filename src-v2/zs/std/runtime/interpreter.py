@@ -1,11 +1,11 @@
 from contextlib import contextmanager
 from functools import singledispatchmethod, partial
 
-from .. import List, String
+from .. import List, String, Int32
 from ..objects.compilation_environment import Module
 from ..objects.function import Function
 from ... import Object
-from ..objects.expression import Call, GetLocal, SetLocal, IndirectCall, ExternalCall
+from ..objects.expression import Call, PushLocal, PopLocal, IndirectCall, ExternalCall
 from ...base import NativeFunction
 from ...processing import StatefulProcessor, State
 
@@ -13,15 +13,21 @@ from ...processing import StatefulProcessor, State
 class Frame:
     _callable: Object
     _locals: dict[str, Object]
+    _names: list[str]
 
     def __init__(self, callable_: Object, arguments: dict[str, Object]):
         self._callable = callable_
         self._locals = arguments
+        self._names = list(arguments.keys())
 
-    def local(self, name: str | String, value: Object = None):
+    def local(self, name: str | String | int | Int32, value: Object = None):
+        if isinstance(name, (int, Int32)):
+            name = self._names[int(name)]
         name = str(name)
         if value is None:
             return self._locals[name]
+        if name not in self._locals:
+            self._names.append(name)
         self._locals[name] = value
 
 
@@ -96,9 +102,9 @@ class Interpreter(StatefulProcessor):
         return call.callable(*map(self.execute, call.arguments))
 
     @_exec
-    def _(self, get: GetLocal):
+    def _(self, get: PushLocal):
         return self.frame().local(get.name)
 
     @_exec
-    def _(self, set_: SetLocal):
+    def _(self, set_: PopLocal):
         return self.frame().local(set_.name, set_.value)

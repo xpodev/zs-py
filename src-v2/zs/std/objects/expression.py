@@ -35,7 +35,7 @@ class ExternalCall(Call):
     ...
 
 
-class GetLocal(Object[node_lib.Expression]):
+class PushLocal(Object[node_lib.Expression]):
     _name: String
 
     def __init__(self, name: str | String, node: node_lib.Expression = None):
@@ -47,23 +47,28 @@ class GetLocal(Object[node_lib.Expression]):
         return self._name
 
 
-class SetLocal(Object[node_lib.Expression]):
+class PopLocal(Object[node_lib.Expression]):
     _name: String
-    _value: Object
 
-    def __init__(self, name: str | String, value: Object, node: node_lib.Expression = None):
+    def __init__(self, name: str | String, node: node_lib.Expression = None):
         super().__init__(node)
         self._name = String(name)
-        self._value = value
 
     @property
     def name(self):
         return self._name
 
-    @property
-    def value(self):
-        return self._value
+
+class Binary(Object[node_lib.Binary]):
+    _left: Object
+    _right: Object
+    _operator: String
+
+    def __init__(self, left: Object, right: Object, operator: str | String, node: node_lib.Binary = None):
+        super().__init__(node)
+        self._left = left
+        self._right = right
+        self._operator = String(operator)
 
 
-# todo: Instead if setlocal having the value as parameter, pop it from the stack
 # the interpreter should be implemented as a stack machine

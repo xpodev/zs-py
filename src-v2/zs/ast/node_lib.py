@@ -118,7 +118,7 @@ class Function(Expression[token_info.Function]):
 
     clauses: List[Union["WhenClause", "WhereClause"]]
 
-    body: Expression | None
+    body: list  # Expression | None
 
     def __init__(
             self,
@@ -357,4 +357,5 @@ class Var(Node[token_info.Var]):
 
     def __init__(self, _var: Token, name: TypedName, _assign: Token | None, initializer: Expression | None):
         super().__init__(token_info.Var(_var, _assign))
-
+        self.name = name
+        self.initializer = initializer

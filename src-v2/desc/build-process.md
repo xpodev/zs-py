@@ -7,3 +7,6 @@ This document defines how this process is done for different kind of nodes.
 
 ## Function Calls
 
+```
+foo()
+```
