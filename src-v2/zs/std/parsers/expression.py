@@ -26,6 +26,8 @@ class ExpressionParser(ContextualParser[Expression]):
         self.add_parser(copy_with(get_identifier, binding_power=0))
         self.add_parser(copy_with(get_string, binding_power=0))
         self.add_parser(SubParser(0, TokenType.Decimal, nud=lambda p: Literal(p.eat(TokenType.Decimal))))
+        self.add_parser(SubParser(0, "true", nud=lambda p: Literal(p.eat("true"))))
+        self.add_parser(SubParser(0, "false", nud=lambda p: Literal(p.eat("false"))))
         self.add_parser(SubParser(100, TokenType.L_Curvy, led=self._next_function_call))
 
         self.add_parser(SubParser(80, ".", led=self._next_member_access))
@@ -36,6 +38,7 @@ class ExpressionParser(ContextualParser[Expression]):
         # self.add_parser(SubParser.infix_l(5, TokenType.Semicolon, lambda parser, left: (parser.eat(":"), parser.next(5))[1]))
 
         self.add_parser(SubParser(20, TokenType.Comma, led=separated(",", 20, Expression)))
+        self.add_parser(SubParser.infix_l(5, ";", self.parse))
         self.symbol(TokenType.R_Curvy)
         self.symbol(TokenType.R_Curly)
 

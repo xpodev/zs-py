@@ -4,7 +4,8 @@ from pathlib import Path
 
 from zs.processing import State, StatefulProcessor
 from .context import Scope
-from .instructions import Instruction, SetLocal, Call, Name, Import, EnterScope, ExitScope, DeleteName
+from .instructions import Instruction, SetLocal, Call, Name, Import, EnterScope, ExitScope, DeleteName, Do, Raw, RawCall
+from .lib import Function
 from .. import Object
 from ..ast import node_lib
 from ..std.processing.import_system import ImportSystem, ImportResult
@@ -12,6 +13,7 @@ from ..std.processing.import_system import ImportSystem, ImportResult
 
 def _get_dict_from_import_result(node: Import, result: ImportResult):
     res = {}
+    errors = []
 
     match node.names:
         case str() as star:
@@ -23,15 +25,18 @@ def _get_dict_from_import_result(node: Import, result: ImportResult):
             raise ValueError(f"Can't perform a default import since that is not a feature yet")
         case list() as names:
             for name in names:
-                if isinstance(name, tuple):
-                    name, item = name
-                    res[name] = result.item(item)
-                else:
-                    res[name] = result.item(name)
+                try:
+                    if isinstance(name, tuple):
+                        name, item = name
+                        res[name] = result.item(item)
+                    else:
+                        res[name] = result.item(name)
+                except KeyError:
+                    errors.append(f"Could not import name \"{name}\" from \"{node.source}\"")
         case _:
             raise TypeError("???")
 
-    return res
+    return res, errors
 
 
 SENTINEL = object()
@@ -50,6 +55,10 @@ class InterpreterState:
     @property
     def global_scope(self):
         return self._global
+
+    @property
+    def local_scope(self):
+        return self._scope
 
     @property
     def frame(self):
@@ -104,8 +113,12 @@ class Interpreter(StatefulProcessor):
         self._x = InterpreterState()
         self._import_system = ImportSystem()
 
+    def execute(self, inst: Object, *args, **kwargs):
+        self.run()
+        return self._execute(inst, *args, **kwargs)
+
     @singledispatchmethod
-    def execute(self, inst: Instruction):
+    def _execute(self, inst: Instruction):
         # self.state.warning(f"Executing instruction {inst} failed", inst)
         return inst
 
@@ -117,11 +130,15 @@ class Interpreter(StatefulProcessor):
     def x(self):
         return self._x
 
-    _exec = execute.register
+    _exec = _execute.register
 
     @_exec
-    def _(self, inst: list):
-        return list(map(self.execute, inst))
+    def _(self, inst: Do):
+        return list(map(self.execute, inst.instructions))
+
+    @_exec
+    def _(self, inst: Raw):
+        return inst.instruction
 
     @_exec
     def _(self, inst: SetLocal):
@@ -131,16 +148,64 @@ class Interpreter(StatefulProcessor):
 
     @_exec
     def _(self, inst: Call):
-        callable_ = self.execute(inst.callable)
+        callable_ = self.execute(inst.callable) if not isinstance(inst.callable, Function) else inst.callable
 
         if callable_ is None:
             return inst
+
+        if callable(getter := getattr(callable_, "get", None)):
+            callable_ = getter()
+
+        if isinstance(callable_, Function):
+            if len(inst.args) != len(callable_.parameters):
+                self.state.error(f"Function \"{callable_.name}\" was called with an improper amount of arguments")
+            else:
+                with self._x.scope() as scope:
+                    for argument, parameter in zip(inst.args, callable_.parameters):
+                        scope.name(str(parameter.name), self.execute(argument))
+
+                    last = None
+                    for inst in callable_.body:
+                        last = self.execute(inst)
+                    return last
 
         if not callable(callable_):
             self.state.error(f"The base interpreter may only execute native functions!", inst)
             return inst
 
         return callable_(*map(self.execute, inst.args))
+
+    @_exec
+    def _(self, inst: RawCall):
+        callable_ = self.execute(inst.callable)
+
+        if callable_ is None:
+            return inst
+
+        if isinstance(callable_, Function):
+            if len(inst.args) != len(callable_.parameters):
+                self.state.error(f"Function \"{callable_.name}\" was called with an improper amount of arguments")
+            else:
+                with self._x.scope() as scope:
+                    for argument, parameter in zip(inst.args, callable_.parameters):
+                        scope.name(str(parameter.name), argument)
+
+                    last = None
+                    for inst in callable_.body:
+                        last = self.execute(inst)
+                    return last
+
+        if not callable(callable_):
+            self.state.error(f"The base interpreter may only execute native functions!", inst)
+            return inst
+
+        return callable_(*inst.args)
+
+    @_exec
+    def _(self, fn: Function, *args, execute=False):
+        if execute:
+            return self.execute(Call(fn, list(args)))
+        return fn
 
     @_exec
     def _(self, inst: Name):
@@ -154,8 +219,12 @@ class Interpreter(StatefulProcessor):
         with self._x.scope():
             result = self.__get_import_result(inst)
 
-        for name, item in _get_dict_from_import_result(inst, result).items():
+        items, errors = _get_dict_from_import_result(inst, result)
+        for name, item in items.items():
             self._x.local(name, item, new=True)
+
+        for error in errors:
+            self.state.error(error, inst)
 
         return result
 
@@ -171,22 +240,26 @@ class Interpreter(StatefulProcessor):
 
     @_exec
     def _(self, _: DeleteName):
+        result = self._x.local(_.name, strict=True)
         if not self._x.local(_.name, None):
             self.state.error(f"Could not delete name \"{_.name}\" because it doesn't exist in the current scope", _)
+        return result
 
     def __get_import_result(self, inst: Import):
         source = self.execute(inst.source)
-        if not isinstance(source, str):
-            raise TypeError(f"Import statement source must evaluate to a string, not \"{type(source)}\"")
+        if isinstance(source, str):
+            # raise TypeError(f"Import statement source must evaluate to a string, not \"{type(source)}\"")
 
-        path = Path(str(source))
+            path = Path(str(source))
 
-        result = self._import_system.import_from(path)
+            result = self._import_system.import_from(path)
 
-        if result is None:
-            return self.state.error(f"Could not import \"{path}\"", inst)
+            if result is None:
+                return self.state.error(f"Could not import \"{path}\"", inst)
 
-        result._node = inst.node
+            result._node = inst.node
 
-        return result
+            return result
+
+        return source  # todo: make sure is ImportResult
 

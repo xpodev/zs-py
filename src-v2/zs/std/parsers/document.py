@@ -39,14 +39,16 @@ class DocumentParser(ContextualParser[List[Node]]):
         self._parser = parser
         self._stream = parser.stream
 
+        # todo: make coroutine
         result = []
         while not self._stream.end:
             node = super().parse(parser, binding_power)
             if node is None:
+                self.state.warning(f"Unexpected None while parsing")
                 break
             result.append(node)
 
-        return List(result)
+        return result
 
     def setup(self, parser: "Parser"):
         # self.add_parser(get_function)

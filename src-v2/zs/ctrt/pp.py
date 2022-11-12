@@ -1,9 +1,9 @@
-from functools import singledispatchmethod
+from functools import singledispatchmethod, reduce
 
 from zs.ast import node_lib
 from zs.ast.node import Node
 from zs.processing import StatefulProcessor, State
-from .instructions import SetLocal, Call, Name, Import, EnterScope, ExitScope, DeleteName
+from .instructions import SetLocal, Call, Name, Import, EnterScope, ExitScope, DeleteName, Do, Raw, RawCall
 from ..text.token import TokenType
 
 
@@ -11,12 +11,20 @@ class Preprocessor(StatefulProcessor):
     def __init__(self, state: State):
         super().__init__(state)
 
-    @singledispatchmethod
     def preprocess(self, node: Node):
+        self.run()
+        return self._preprocess(node)
+
+    @singledispatchmethod
+    def _preprocess(self, node: Node):
         self.state.warning(f"Preprocessing node {node}", node)
         return node
 
-    _pp = preprocess.register
+    _pp = _preprocess.register
+
+    @_pp
+    def _(self, node: node_lib.Binary):
+        return Call(Name(f"_{str(node.token_info.operator.value)}_"), [self.preprocess(node.left), self.preprocess(node.right)], node)
 
     @_pp
     def _(self, node: node_lib.Function):
@@ -25,9 +33,9 @@ class Preprocessor(StatefulProcessor):
 
         delete = name is None
         if delete:
-            name = f"$"
+            name = "$"
 
-        var = SetLocal(name, init, node)
+        var = SetLocal(name, init, True, node)
 
         parameters = []
         for parameter in node.parameters:
@@ -35,19 +43,9 @@ class Preprocessor(StatefulProcessor):
                 Call(
                     Call(
                         Name("_._"),
-                        [Call(Name("_._"), [Name(name), "body"]), "append"]
+                        [Name(name), "add_parameter"]
                     ),
-                    [
-                        SetLocal(
-                            parameter.name,
-                            Call(
-                                Call(
-                                    Name("_._"),
-                                    [Name(name), "add_parameter"]),
-                                [parameter.name, self.preprocess(parameter.type)]),
-                            parameter.node
-                        )
-                    ]
+                    [parameter.name.name, self.preprocess(parameter.type) if parameter.type else None]
                 )
             )
 
@@ -55,8 +53,10 @@ class Preprocessor(StatefulProcessor):
         for inst in node.body:
             ir = self.preprocess(inst)
             if isinstance(ir, list):
+                ir = list(map(Raw, ir))
                 method = "extend"
             else:
+                ir = Raw(ir)
                 method = "append"
             body.append(
                 Call(
@@ -68,18 +68,26 @@ class Preprocessor(StatefulProcessor):
                 )
             )
 
-        return [
+        return reduce(lambda x, y: RawCall(Name("_;_"), [x, y]), [
             var,
             EnterScope(),
             *parameters,
             *body,
             ExitScope(),
-            *([DeleteName(name)] if delete else [])
-        ]
+            DeleteName(name) if delete else Name(name)
+        ])
+        # return Do(*[
+        #     var,
+        #     EnterScope(),
+        #     *parameters,
+        #     *body,
+        #     ExitScope(),
+        #     *([DeleteName(name)] if delete else [])
+        # ], node)
 
     @_pp
     def _(self, node: node_lib.Var):
-        return SetLocal(str(node.name.name.name), self.preprocess(node.initializer), node)
+        return SetLocal(str(node.name.name.name), self.preprocess(node.initializer), True, node)
 
     @_pp
     def _(self, node: node_lib.FunctionCall):
@@ -109,8 +117,20 @@ class Preprocessor(StatefulProcessor):
         return Import(self.preprocess(node.source), names, node)
 
     @_pp
+    def _(self, node: node_lib.Inlined):
+        result = self.preprocess(node.item)
+
+        match result:
+            case Import():
+                return result
+
+    @_pp
     def _(self, node: node_lib.Literal):
         value = node.token_info.literal.value
+        if value == "true":
+            return True
+        if value == "false":
+            return False
         match node.token_info.literal.type:
             case TokenType.String:
                 return str(value)

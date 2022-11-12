@@ -11,9 +11,7 @@ from ..processing import StatefulProcessor, State
 
 Unary = lambda *args: args  # todo: import
 
-
 _T = TypeVar("_T")
-
 
 __all__ = [
     "ContextualParser",
@@ -114,6 +112,11 @@ class ContextualParser(StatefulProcessor, Generic[_T]):
 
     def parse(self, parser: "Parser", binding_power: Int32) -> _T:
         stream = parser.stream
+
+        if stream.token == TokenType.Breakpoint:
+            breakpoint()
+            stream.read()
+
         sub = self._get_parser_for(stream.token)
         left = sub.nud(parser)
 
@@ -123,8 +126,8 @@ class ContextualParser(StatefulProcessor, Generic[_T]):
         while (sub := self._get_parser_for(stream.token)) is not None and binding_power < sub.binding_power:
             left = sub.led(parser, left)
 
-        if sub is None:
-            self.state.error(f"Could not parse token \"{stream.token}\"")
+        # if sub is None:
+        #     self.state.error(f"Could not parse token \"{stream.token}\"")
 
         return left
 
@@ -146,11 +149,15 @@ class ContextualParser(StatefulProcessor, Generic[_T]):
         return parser
 
     def _get_parser_for(self, token: Token):
-        sub = self._parsers.get(token.value, None) or self._parsers.get(token.type, None)
+        sub = (
+                self._parsers.get(token.type, None) or self._parsers.get(token.value, None)
+        ) if token != TokenType.Identifier else (
+                self._parsers.get(token.value, None) or self._parsers.get(token.type, None)
+        )
         if sub is None:
             sub = self._on_unknown_token(token)
-        if sub is None:
-            self.state.error(f"Could not parse token: {token}")
+        # if sub is None:
+        #     self.state.error(f"Could not parse token: {token}")
         return sub
 
     def _on_unknown_token(self, token: Token):
@@ -191,15 +198,24 @@ class Parser(StatefulProcessor):
             self._parser_stack.pop()
 
     @overload
-    def add(self, type: Type[_T]): ...
+    def add(self, type: Type[_T]):
+        ...
+
     @overload
-    def add(self, type: Type[_T], constructor: Type[ContextualParser[_T]]): ...
+    def add(self, type: Type[_T], constructor: Type[ContextualParser[_T]]):
+        ...
+
     @overload
-    def add(self, type: Type[_T], parser: ContextualParser[_T]): ...
+    def add(self, type: Type[_T], parser: ContextualParser[_T]):
+        ...
+
     @overload
-    def add(self, name: str | String, parser: ContextualParser[_T]): ...
+    def add(self, name: str | String, parser: ContextualParser[_T]):
+        ...
+
     @overload
-    def add(self, parser: ContextualParser[_T]): ...
+    def add(self, parser: ContextualParser[_T]):
+        ...
 
     def add(self, *args):
         try:
@@ -217,9 +233,12 @@ class Parser(StatefulProcessor):
                 self.add(parser(self.state))
 
     @overload
-    def eat(self, type_: TokenType) -> Token | None: ...
+    def eat(self, type_: TokenType) -> Token | None:
+        ...
+
     @overload
-    def eat(self, value: str | String) -> Token | None: ...
+    def eat(self, value: str | String) -> Token | None:
+        ...
 
     def eat(self, type_or_value: TokenType | str | String) -> Token | None:
         if not self.token(type_or_value):
@@ -228,9 +247,12 @@ class Parser(StatefulProcessor):
         return self.stream.read()
 
     @overload
-    def get(self, name: str | String) -> ContextualParser: ...
+    def get(self, name: str | String) -> ContextualParser:
+        ...
+
     @overload
-    def get(self, type_: type) -> ContextualParser: ...
+    def get(self, type_: type) -> ContextualParser:
+        ...
 
     def get(self, name_or_type: str | String | type) -> ContextualParser:
         if isinstance(name_or_type, str):
@@ -238,11 +260,16 @@ class Parser(StatefulProcessor):
         return self._context_parsers[name_or_type]
 
     @overload
-    def next(self, binding_power: int | Int32 = 0) -> Node: ...
+    def next(self, binding_power: int | Int32 = 0) -> Node:
+        ...
+
     @overload
-    def next(self, name: str | String, binding_power: int | Int32 = 0) -> Node: ...
+    def next(self, name: str | String, binding_power: int | Int32 = 0) -> Node:
+        ...
+
     @overload
-    def next(self, type_: Type[_T], binding_power: int | Int32 = 0) -> _T: ...
+    def next(self, type_: Type[_T], binding_power: int | Int32 = 0) -> _T:
+        ...
 
     def next(self, name: str | String | Type[_T] | int | Int32 = None, binding_power=0) -> Node | _T:
         if isinstance(name, (int, Int32)):
@@ -256,11 +283,16 @@ class Parser(StatefulProcessor):
             self.state.error(f"Unknown parser \"{name}\" was invoked")
 
     @overload
-    def token(self) -> Token: ...
+    def token(self) -> Token:
+        ...
+
     @overload
-    def token(self, type_: TokenType, *, eat: bool | Bool = False) -> Bool: ...
+    def token(self, type_: TokenType, *, eat: bool | Bool = False) -> Bool:
+        ...
+
     @overload
-    def token(self, value: str | String, *, eat: bool | Bool = False) -> Bool: ...
+    def token(self, value: str | String, *, eat: bool | Bool = False) -> Bool:
+        ...
 
     def token(self, type_or_value: TokenType | str | String = None, eat: bool | Bool = False) -> Bool | Token:
         if type_or_value is None:
@@ -284,16 +316,24 @@ class Parser(StatefulProcessor):
         return s
 
     @overload
-    def parse(self, stream: TokenStream): ...
+    def parse(self, stream: TokenStream):
+        ...
+
     @overload
-    def parse(self, stream: TokenStream, binding_power: int): ...
+    def parse(self, stream: TokenStream, binding_power: int):
+        ...
+
     @overload
-    def parse(self, stream: TokenStream, binding_power: Int32): ...
+    def parse(self, stream: TokenStream, binding_power: Int32):
+        ...
 
     def parse(self, stream: TokenStream, binding_power: int | Int32 = 0):
         self.run()
         self._stream = stream
-        return self.next(binding_power)
+        result = self.next(binding_power)
+        if result is None:
+            self.state.error(f"Could not parse token {self.stream.token}", self.stream.token)
+        return result
 
     def setup(self):
         for parser in self.parsers:

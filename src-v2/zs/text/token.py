@@ -32,6 +32,7 @@ class TokenType(String, Enum):
 
     EOF = f"{TokenCategory.Misc}.EOF"
     Unknown = f"{TokenCategory.Misc}.Unknown"
+    Breakpoint = f"{TokenCategory.Misc}.Breakpoint"
 
     Identifier = f"{TokenCategory.Term}.Identifier"
 

@@ -1,9 +1,14 @@
-let compiler = get Compiler;
+import * from "env/libraries/ntools.zs";
+inline import * from "env/libraries/builtins.zs";
 
-compiler.Context.Add("__srf__", compiler);
+var cls_parser = Object()
+setattr(cls_parser, "nud", fun(parser) {
+    parser.stream.read();
+    print("asd")
+})
+setattr(cls_parser, "binding_power", 0)
+setattr(cls_parser, "token", "ASD")
+var doc_p = __srf__.toolchain.parser.get("Document")
+print(doc_p)
 
-compiler.Context.Add("__file__", get fun() => __srf__.CurrentFile);
-
-compiler.Context.Add("__module__", get fun() => __srf__.Modules.Top());
-
-import * from "env/libraries/builtins.zs"
+doc_p.add_parser(cls_parser)

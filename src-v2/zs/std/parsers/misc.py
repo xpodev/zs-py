@@ -164,7 +164,8 @@ def get_import(parser: Parser):
 
     _from = parser.eat("from")
 
-    source = Literal(parser.eat(TokenType.String))  # todo: expression
+    # source = Literal(parser.eat(TokenType.String))  # todo: expression
+    source = parser.next(Expression, 30)
 
     return Import(
         _import, _l_curly, imported_names, _r_curly, _from, source, parser.eat(";")

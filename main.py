@@ -1,27 +1,44 @@
+from functools import partial, partialmethod
 from pathlib import Path
 from typing import Callable
 
 from zs.base import NativeFunction
 from zs.cli.options import Options, get_options
-from zs.ctrt.lib import Function, ExObj
+from zs.ctrt.lib import Function, ExObj, Field
 from zs.processing import State, StatefulProcessor
-from zs.std import Int32
 from zs.std.importers import ZSImporter
 from zs.std.objects.compilation_environment import Document, ContextManager
 from zs.std.parsers.std import get_standard_parser
+from zs.std.processing.import_system import ImportResult
 from zs.std.processing.toolchain import Toolchain
+
+
+class Builtins(ImportResult, ExObj):
+    def __init__(self):
+        super().__init__()
+
+    def all(self):
+        return vars(self)
+
+    def item(self, name: str):
+        return getattr(self, name)
+
+    def items(self, names: list[str]):
+        return list(map(partial(getattr, self), names))
 
 
 class Compiler(StatefulProcessor):
     _context: ContextManager
     _toolchain: Toolchain
     _toolchain_factory: Callable[["Compiler"], Toolchain]
+    builtins: Builtins
 
     def __init__(self, *, state: State = None, context: ContextManager = None, toolchain_factory: Callable[["Compiler"], Toolchain] = None):
         super().__init__(state or State())
         self._context = context or ContextManager()
         self._toolchain_factory = toolchain_factory or (lambda _: Toolchain(state=self.state, context=self._context))
         self._toolchain = toolchain_factory(self)
+        self.builtins = Builtins()
 
     @property
     def context(self):
@@ -60,21 +77,34 @@ def main(options: Options):
 
     import_system.add_importer(ZSImporter(import_system, compiler), ".zs")
 
-    compiler.toolchain.interpreter.x.local("__srf__", compiler)
-    compiler.toolchain.interpreter.x.local("_._", NativeFunction(lambda o, n: getattr(o, str(n))))
-    compiler.toolchain.interpreter.x.local("Function", Function)
-    compiler.toolchain.interpreter.x.local("Object", ExObj)
-    compiler.toolchain.interpreter.x.local("getattr", NativeFunction(lambda o, n: getattr(o, str(n))))
-    compiler.toolchain.interpreter.x.local("setattr", NativeFunction(lambda o, n, v: setattr(o, str(n), v)))
-    compiler.toolchain.interpreter.x.local("print", NativeFunction(lambda *args, **kwargs: print(*args, **{
+    builtins = compiler.builtins
+
+    def _assign(left, right):
+        if isinstance(left, Field):
+            return left.set(right)
+        if isinstance(left, str):
+            compiler.toolchain.interpreter.x.local(left, right)
+
+    def _set(obj, n, value):
+        o = compiler.toolchain.interpreter.execute(obj)
+        v = compiler.toolchain.interpreter.execute(value)
+        setattr(o, str(n), v)
+        return v
+
+    builtins.Function = Function
+    builtins.Object = ExObj
+    builtins.getattr = NativeFunction(lambda o, n: getattr(o, str(n)))
+    builtins.setattr = NativeFunction(lambda o, n, v: _set(o, n, v))
+    builtins.print = NativeFunction(lambda *args, **kwargs: print(*args, **{
         n: compiler.toolchain.interpreter.execute(value) for n, value in kwargs.items()
-    })))
+    }))
+    builtins.partial = partial
+    builtins.partialmethod = partialmethod
 
-    context.add(NativeFunction(lambda o, n, v: setattr(o, str(n), v)), "setattr")
-    context.add(NativeFunction(lambda o, n: getattr(o, str(n))), "getattr")
-    context.add(NativeFunction(lambda *args, **kwargs: print(*args, **kwargs)), "print")
-
-    context.add(Int32, "i32")
+    compiler.toolchain.interpreter.x.local("__srf__", compiler)
+    compiler.toolchain.interpreter.x.local("_._", lambda o, n: getattr(o, str(n)))
+    compiler.toolchain.interpreter.x.local("_=_", _assign)
+    compiler.toolchain.interpreter.x.local("_;_", lambda l, r: (compiler.toolchain.interpreter.execute(l), compiler.toolchain.interpreter.execute(r))[1])
 
     try:
         compiler.compile(options.source)
@@ -93,7 +123,7 @@ def main(options: Options):
         state.reset()
 
         for message in state.messages:
-            print(f"[{message.type.value}] {message.origin} -> {message.content}")
+            print(f"[{message.processor.__class__.__name__}] [{message.type.value}] {message.origin} -> {message.content}")
 
 
 if __name__ == '__main__':

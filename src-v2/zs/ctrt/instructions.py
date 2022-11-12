@@ -17,11 +17,13 @@ class Name(Instruction):
 class SetLocal(Instruction):
     name: str
     value: Object | None
+    new: bool
 
-    def __init__(self, name: str, value: Object | None, node: Node = None):
+    def __init__(self, name: str, value: Object | None, new: bool = False, node: Node = None):
         super().__init__(node)
         self.name = name
         self.value = value
+        self.new = new
 
 
 class Call(Instruction):
@@ -60,3 +62,23 @@ class EnterScope(Instruction):
 class ExitScope(Instruction):
     def __init__(self, node: Node = None):
         super().__init__(node)
+
+
+class Do(Instruction):
+    instructions: list[Instruction]
+
+    def __init__(self, *inst, node: Node | None = None):
+        super().__init__(node)
+        self.instructions = list(inst)
+
+
+class Raw(Instruction):
+    instruction: Instruction
+
+    def __init__(self, inst: Instruction, node: Node | None = None):
+        super().__init__(node)
+        self.instruction = inst
+
+
+class RawCall(Call):
+    ...

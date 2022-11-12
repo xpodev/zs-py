@@ -71,7 +71,7 @@ class ImportSystem(Importer):
     def import_file(self, path: Path) -> ImportResult | None:
         try:
             return self._importers[String(path.suffix)].import_file(path)
-        except KeyError:
+        except KeyError as e:
             return None
 
     def import_from(self, path: Path) -> ImportResult | None:

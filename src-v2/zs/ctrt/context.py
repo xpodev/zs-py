@@ -19,6 +19,10 @@ class Scope(EmptyObject):
     def parent(self):
         return self._parent
 
+    @property
+    def items(self):
+        return self._items
+
     def name(self, name: str, value: Object | None = SENTINEL, /, *, strict=False, new=False, srf=False):
         if value is SENTINEL:
             if name not in self._items:

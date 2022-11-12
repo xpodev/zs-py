@@ -15,12 +15,14 @@ class Message(EmptyObject):
     _type: MessageType
     _origin: Object | None
     _content: String
+    _processor: "StatefulProcessor"
 
-    def __init__(self, message_type: MessageType, message: str | String, origin: Object = None):
+    def __init__(self, message_type: MessageType, message: str | String, origin: Object = None, proc: "StatefulProcessor" = None):
         super().__init__()
         self._type = message_type
         self._origin = origin
         self._content = String(message)
+        self._processor = proc
 
     @property
     def content(self):
@@ -33,6 +35,10 @@ class Message(EmptyObject):
     @property
     def type(self):
         return self._type
+
+    @property
+    def processor(self):
+        return self._processor
 
 
 class State(EmptyObject):
@@ -65,7 +71,7 @@ class State(EmptyObject):
         self.message(MessageType.Info, message, origin)
 
     def message(self, message_type: MessageType, message: str | String, origin: Object = None):
-        self._messages.add(Message(message_type, String(message), origin))
+        self._messages.add(Message(message_type, String(message), origin, self._processor))
 
     def reset(self):
         self._processor = None

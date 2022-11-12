@@ -65,15 +65,18 @@ class Toolchain(StatefulProcessor):
 
             nodes = self._parser.parse(token_stream)
 
-        document = Document(info, nodes)
+        # document = Document(info, nodes)
 
-        with self._context.document(document), self._interpreter.x.scope():
+        with self._interpreter.x.scope() as scope, self._context.document(scope):
             # self._interpreter.execute_document(document.nodes)
 
             preprocessor = Preprocessor(self.state)
 
-            pp = list(map(preprocessor.preprocess, nodes))
+            for node in nodes:
+                self._interpreter.execute(preprocessor.preprocess(node))
 
-            result = list(map(self._interpreter.execute, pp))
+            # for name, item in self.interpreter.x._scope._items.items():
+            #     document.add(item, name)
 
-            return document
+            # return document
+            return self.interpreter.x.local_scope

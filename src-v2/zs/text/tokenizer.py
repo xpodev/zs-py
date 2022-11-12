@@ -64,7 +64,7 @@ class Tokenizer(StatefulProcessor):
         self._stream = None
 
     def tokenize(self, document: SourceFile) -> Iterable[Token]:
-        # self.run()
+        self.run()
 
         self._document = document
         self._stream = TextStream(document.content_stream)
@@ -86,6 +86,8 @@ class Tokenizer(StatefulProcessor):
         char = self._stream.read(1)
 
         match char:
+            case '$':
+                return self._token(TokenType.Breakpoint, char)
             case '\n':
                 return self._token(TokenType.NewLine, char)
             case ' ':
