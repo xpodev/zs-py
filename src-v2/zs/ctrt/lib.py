@@ -27,6 +27,10 @@ class Function(Object):
         return parameter
 
 
+class CodeGenFunction(Function):
+    ...
+
+
 class Field:
     ref: "ExObj"
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from zs.processing import State, StatefulProcessor
 from .context import Scope
 from .instructions import Instruction, SetLocal, Call, Name, Import, EnterScope, ExitScope, DeleteName, Do, Raw, RawCall
-from .lib import Function
+from .lib import Function, CodeGenFunction
 from .. import Object
 from ..ast import node_lib
 from ..std.processing.import_system import ImportSystem, ImportResult
@@ -154,8 +154,13 @@ class Interpreter(StatefulProcessor):
             return inst
 
         if callable(getter := getattr(callable_, "get", None)):
-            callable_ = getter()
+            try:
+                callable_ = getter()
+            except TypeError:
+                ...
 
+        if isinstance(callable_, CodeGenFunction):
+            return self.execute(RawCall(callable_, inst.args, inst.node))
         if isinstance(callable_, Function):
             if len(inst.args) != len(callable_.parameters):
                 self.state.error(f"Function \"{callable_.name}\" was called with an improper amount of arguments")

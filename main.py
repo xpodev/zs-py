@@ -4,7 +4,7 @@ from typing import Callable
 
 from zs.base import NativeFunction
 from zs.cli.options import Options, get_options
-from zs.ctrt.lib import Function, ExObj, Field
+from zs.ctrt.lib import Function, ExObj, Field, CodeGenFunction
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter
 from zs.std.objects.compilation_environment import Document, ContextManager
@@ -91,6 +91,7 @@ def main(options: Options):
         setattr(o, str(n), v)
         return v
 
+    builtins.CodeGenFunction = CodeGenFunction
     builtins.Function = Function
     builtins.Object = ExObj
     builtins.getattr = NativeFunction(lambda o, n: getattr(o, str(n)))

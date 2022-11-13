@@ -17,8 +17,11 @@ class Preprocessor(StatefulProcessor):
 
     @singledispatchmethod
     def _preprocess(self, node: Node):
-        self.state.warning(f"Preprocessing node {node}", node)
-        return node
+        # self.state.warning(f"Preprocessing node {node}", node)
+        if node is None:
+            return node
+        return Call(Name(f"pp_{type(node).__name__}"), [node])
+        # return node
 
     _pp = _preprocess.register
 
