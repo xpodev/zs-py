@@ -30,7 +30,7 @@ class Scope(EmptyObject):
                     return None
                 if self._parent is None:
                     return None
-                return self._parent.name(name, strict=strict)
+                return self._parent.name(name)
             return self._items[name]
         if value is None:
             return self._items.pop(name, None)

@@ -178,7 +178,7 @@ class Interpreter(StatefulProcessor):
             self.state.error(f"The base interpreter may only execute native functions!", inst)
             return inst
 
-        return callable_(*map(self.execute, inst.args))
+        return self.execute(callable_(*map(self.execute, inst.args)))
 
     @_exec
     def _(self, inst: RawCall):

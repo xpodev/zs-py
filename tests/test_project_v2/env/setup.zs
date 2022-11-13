@@ -34,6 +34,12 @@ var if = codegen(fun(condition, true_, false_) {
     }(dict())
 })
 
+var while = codegen(fun(condition, body) {
+    fun rec(body_, condition_) {
+       if(condition_, fun() { __srf__.toolchain.interpreter.execute(body_); rec(body_, condition_) }(), fun() {}())
+    }(body, condition)
+})
+
 fun pp_Call(node) { node }
 
 
@@ -42,8 +48,10 @@ var ASDNode = create_type("ASDNode")
 var cls_parser = Object()
 setattr(cls_parser, "nud", fun(parser) {
     parser.stream.read();
-    print("asd");
-    ASDNode()
+    fun (node) {
+        setattr(node, "value", parser.stream.read().value);
+        node
+    }(ASDNode())
 })
 setattr(cls_parser, "binding_power", 0)
 setattr(cls_parser, "token", "ASD")
@@ -60,3 +68,22 @@ if(false,
         print("false!!!")
     }()
 )
+
+fun id(x) { x }
+
+var Call = codegen(id)(fun(){}()).__class__
+print(Call)
+
+var Name = codegen(id)(id).__class__
+print(Name)
+
+var o = Object()
+setattr(o, "v", 2)
+while(o.v.__ge__(0), fun() { print("Hello!"); setattr(o, "v", o.v.__sub__(1)) }())
+
+fun pp_ASDNode(node) {
+    fun (args) {
+        args.append(node.value);
+        Call(print, args)
+    }(list())
+}
