@@ -32,7 +32,10 @@ class Preprocessor(StatefulProcessor):
     @_pp
     def _(self, node: node_lib.Function):
         name = str(node.name.name) if node.name is not None else None
-        init = Call(Name("Function", node_lib.Identifier(node.token_info.keyword_fun)), [name], node)
+        init = Call(Name("Function", node_lib.Identifier(node.token_info.keyword_fun)), [
+            name,
+            Call(Name("_._"), [Call(Name("_._"), [Call(Name("_._"), [Call(Name("_._"), [Name("__srf__"), "toolchain"]), "interpreter"]), "x"]), "local_scope"])
+        ], node)
 
         delete = name is None
         if delete:
@@ -73,7 +76,7 @@ class Preprocessor(StatefulProcessor):
 
         return reduce(lambda x, y: RawCall(Name("_;_"), [x, y]), [
             var,
-            EnterScope(),
+            EnterScope(None),
             *parameters,
             *body,
             ExitScope(),

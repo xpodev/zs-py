@@ -1,5 +1,6 @@
 from zs import Object
 from zs.ast.node import Node
+from zs.ctrt.context import Scope
 
 
 class Instruction(Object):
@@ -55,8 +56,11 @@ class DeleteName(Instruction):
 
 
 class EnterScope(Instruction):
-    def __init__(self, node: Node = None):
+    parent: Scope
+
+    def __init__(self, parent: Scope | None, node: Node = None):
         super().__init__(node)
+        self.parent = parent
 
 
 class ExitScope(Instruction):

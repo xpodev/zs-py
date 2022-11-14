@@ -1,8 +1,2 @@
 
-
-inline import * from "src/imported.zs";
-
-import { Test } from "env/libraries/test.zs";
-
-
-ASD HELLLOOOO
+if (true) { print("TRUE") } else { print("FALSE") }

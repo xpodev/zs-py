@@ -86,7 +86,7 @@ class InterpreterState:
 
             scope, self._scope = self._scope, scope
             try:
-                yield scope
+                yield self._scope
             finally:
                 self._scope = scope
 
@@ -165,9 +165,9 @@ class Interpreter(StatefulProcessor):
             if len(inst.args) != len(callable_.parameters):
                 self.state.error(f"Function \"{callable_.name}\" was called with an improper amount of arguments")
             else:
-                with self._x.scope() as scope:
+                with self._x.scope(Scope(callable_.scope)) as scope:
                     for argument, parameter in zip(inst.args, callable_.parameters):
-                        scope.name(str(parameter.name), self.execute(argument))
+                        self._x.local(str(parameter.name), self.execute(argument), new=True)
 
                     last = None
                     for inst in callable_.body:
@@ -235,7 +235,7 @@ class Interpreter(StatefulProcessor):
 
     @_exec
     def _(self, _: EnterScope):
-        self._x.enter_scope()
+        self._x.enter_scope(Scope(_.parent or self._x.local_scope))
         return _
 
     @_exec

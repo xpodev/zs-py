@@ -1,5 +1,5 @@
 from zs import Object
-
+from zs.ctrt.context import Scope
 
 _SINGULARITY = object()
 
@@ -15,11 +15,12 @@ class Parameter:
 class Function(Object):
     parameters: list[Parameter]
 
-    def __init__(self, name: str | None):
+    def __init__(self, name: str | None, scope: Scope = None):
         super().__init__()
         self.name = name
         self.parameters = []
         self.body = []
+        self.scope = scope
 
     def add_parameter(self, name: str, type_: Object):
         parameter = Parameter(name, type_, len(self.parameters), self)
