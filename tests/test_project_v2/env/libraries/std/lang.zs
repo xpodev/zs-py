@@ -101,3 +101,6 @@ setattr(__parser_if, "nud", fun(parser) {
 setattr(__parser_if, "binding_power", 0)
 setattr(__parser_if, "token", "if")
 __srf__.toolchain.parser.get("Document").add_parser(__parser_if)
+
+var _parser_while = Object()
+
