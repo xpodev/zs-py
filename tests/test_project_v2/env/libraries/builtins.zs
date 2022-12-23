@@ -14,6 +14,23 @@ var Function_call = partialmethod(__srf__.toolchain.interpreter.execute)
 Function_call.keywords.__setitem__("execute", true)
 setattr(Function, "__call__", Function_call)
 
+// add closures to Z# functions
+var Function_refer = partialmethod(fun(func, name, value) {
+    setattr(func.__closure__, name, value);
+    func
+})
+setattr(Function, "refer", Function_refer)
+
+
+var INTERPRETER = __srf__.toolchain.interpreter
+
+// Setup the "_._" operator again
+fun GET_ATTR(left, right) {
+    getattr(INTERPRETER.execute(left), right)
+}
+
+//INTERPRETER.x.local("_._", GET_ATTR)
+
 // setup the Python backend interface
 
 fun id(x) { x }

@@ -1,3 +1,5 @@
+import sys
+
 from functools import partial, partialmethod
 from pathlib import Path
 from typing import Callable
@@ -86,15 +88,21 @@ def main(options: Options):
             compiler.toolchain.interpreter.x.local(left, right)
 
     def _set(obj, n, value):
-        o = compiler.toolchain.interpreter.execute(obj)
-        v = compiler.toolchain.interpreter.execute(value)
+        o = compiler.toolchain.interpreter.execute(obj, runtime=False)
+        v = compiler.toolchain.interpreter.execute(value, runtime=False)
         setattr(o, str(n), v)
         return v
+
+    def _get(obj, n):
+        try:
+            return getattr(obj, str(n))
+        except AttributeError:
+            ...
 
     builtins.CodeGenFunction = CodeGenFunction
     builtins.Function = Function
     builtins.Object = ExObj
-    builtins.getattr = NativeFunction(lambda o, n: getattr(o, str(n)))
+    builtins.getattr = NativeFunction(lambda o, n: _get)
     builtins.setattr = NativeFunction(lambda o, n, v: _set(o, n, v))
     builtins.print = NativeFunction(lambda *args, **kwargs: print(*args, **{
         n: compiler.toolchain.interpreter.execute(value) for n, value in kwargs.items()
@@ -103,9 +111,9 @@ def main(options: Options):
     builtins.partialmethod = partialmethod
 
     compiler.toolchain.interpreter.x.local("__srf__", compiler)
-    compiler.toolchain.interpreter.x.local("_._", lambda o, n: getattr(o, str(n)))
+    compiler.toolchain.interpreter.x.local("_._", _get)
     compiler.toolchain.interpreter.x.local("_=_", _assign)
-    compiler.toolchain.interpreter.x.local("_;_", lambda l, r: (compiler.toolchain.interpreter.execute(l), compiler.toolchain.interpreter.execute(r))[1])
+    compiler.toolchain.interpreter.x.local("_;_", lambda l, r: (compiler.toolchain.interpreter.execute(l, runtime=False), compiler.toolchain.interpreter.execute(r, runtime=False))[1])
 
     try:
         compiler.compile(options.source)
@@ -128,4 +136,5 @@ def main(options: Options):
 
 
 if __name__ == '__main__':
+    sys.setrecursionlimit(10000)
     main(get_options())

@@ -15,8 +15,8 @@ class Parameter:
 class Function(Object):
     parameters: list[Parameter]
 
-    def __init__(self, name: str | None, scope: Scope = None):
-        super().__init__()
+    def __init__(self, name: str | None, scope: Scope = None, node=None):
+        super().__init__(node)
         self.name = name
         self.parameters = []
         self.body = []

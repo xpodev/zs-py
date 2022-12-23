@@ -24,3 +24,6 @@ class Node(Object[None], Generic[TokenInfoT]):
     @property
     def token_info(self):
         return self._token_info
+
+    def __str__(self):
+        return str(self._token_info)

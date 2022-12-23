@@ -4,7 +4,8 @@ from zs import Object, EmptyObject
 
 
 SENTINEL = object()
-
+DELETE = object()
+UNDEFINED = object()
 
 class Scope(EmptyObject):
     _parent: Optional["Scope"]
@@ -27,12 +28,12 @@ class Scope(EmptyObject):
         if value is SENTINEL:
             if name not in self._items:
                 if strict:
-                    return None
+                    return UNDEFINED
                 if self._parent is None:
-                    return None
+                    return UNDEFINED
                 return self._parent.name(name)
             return self._items[name]
-        if value is None:
+        if value is DELETE:
             return self._items.pop(name, None)
         if new:
             if strict and name in self._items:

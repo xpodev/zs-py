@@ -1,9 +1,9 @@
 from contextlib import contextmanager
-from functools import singledispatchmethod
+from functools import singledispatchmethod, partial
 from pathlib import Path
 
 from zs.processing import State, StatefulProcessor
-from .context import Scope
+from .context import Scope, DELETE, UNDEFINED
 from .instructions import Instruction, SetLocal, Call, Name, Import, EnterScope, ExitScope, DeleteName, Do, Raw, RawCall
 from .lib import Function, CodeGenFunction
 from .. import Object
@@ -42,8 +42,18 @@ def _get_dict_from_import_result(node: Import, result: ImportResult):
 SENTINEL = object()
 
 
+class Frame(Scope):
+    function: Function
+    args: list[Object]
+
+    def __init__(self, function: Function, args: list[Object]):
+        super().__init__(function.scope)
+        self.function = function
+        self.args = args
+
+
 class InterpreterState:
-    _frames: list[dict[str, Object]]
+    _frames: list[Scope]
     _scope: Scope | None
     _global: Scope
 
@@ -61,22 +71,22 @@ class InterpreterState:
         return self._scope
 
     @property
-    def frame(self):
-        def _(frame: dict[str, Object] = None):
-            if frame is None:
-                return self._frames[-1]
+    def frames(self):
+        return self._frames
 
-            @contextmanager
-            def _():
-                self._frames.append(frame)
-                try:
-                    yield
-                finally:
-                    self._frames.pop()
+    def frame(self, frame: Scope = None):
+        if frame is None:
+            return self._frames[-1]
 
-            return _
+        @contextmanager
+        def _():
+            self._frames.append(frame)
+            try:
+                yield
+            finally:
+                self._frames.pop()
 
-        return _
+        return _()
 
     def scope(self, scope_: Scope = None):
         @contextmanager
@@ -113,9 +123,12 @@ class Interpreter(StatefulProcessor):
         self._x = InterpreterState()
         self._import_system = ImportSystem()
 
-    def execute(self, inst: Object, *args, **kwargs):
+    def execute(self, inst: Object, *args, scope=None, runtime=True, **kwargs):
         self.run()
-        return self._execute(inst, *args, **kwargs)
+        with self._x.scope(scope or self._x.local_scope):
+            if runtime:
+                ...
+            return self._execute(inst, *args, **kwargs)
 
     @singledispatchmethod
     def _execute(self, inst: Instruction):
@@ -134,7 +147,7 @@ class Interpreter(StatefulProcessor):
 
     @_exec
     def _(self, inst: Do):
-        return list(map(self.execute, inst.instructions))
+        return list(map(partial(self.execute, runtime=False), inst.instructions))
 
     @_exec
     def _(self, inst: Raw):
@@ -142,13 +155,13 @@ class Interpreter(StatefulProcessor):
 
     @_exec
     def _(self, inst: SetLocal):
-        if self._x.local(inst.name, self.execute(inst.value), new=True) is False:
+        if self._x.local(inst.name, self.execute(inst.value, runtime=False), new=True) is False:
             self.state.error(f"Variable {inst.name} already exists in scope", inst)
         return inst
 
     @_exec
     def _(self, inst: Call):
-        callable_ = self.execute(inst.callable) if not isinstance(inst.callable, Function) else inst.callable
+        callable_ = self.execute(inst.callable, runtime=False) if not isinstance(inst.callable, Function) else inst.callable
 
         if callable_ is None:
             return inst
@@ -160,29 +173,40 @@ class Interpreter(StatefulProcessor):
                 ...
 
         if isinstance(callable_, CodeGenFunction):
-            return self.execute(RawCall(callable_, inst.args, inst.node))
+            return self.execute(RawCall(callable_, inst.args, inst.node), runtime=False)
         if isinstance(callable_, Function):
             if len(inst.args) != len(callable_.parameters):
-                self.state.error(f"Function \"{callable_.name}\" was called with an improper amount of arguments")
+                if callable_.name:
+                    self.state.error(
+                        f"Function \"{callable_.name}\" was called with an improper amount of arguments. Expected: {len(callable_.parameters)}, Got: {len(inst.args)}",
+                        callable_.node or callable_
+                    )
+                else:
+                    self.state.error(
+                        f"Anonymous function called with an improper amount of arguments. Expected: {len(callable_.parameters)}, Got: {len(inst.args)}",
+                        callable_.node or callable_
+                    )
             else:
-                with self._x.scope(Scope(callable_.scope)) as scope:
-                    for argument, parameter in zip(inst.args, callable_.parameters):
-                        self._x.local(str(parameter.name), self.execute(argument), new=True)
+                frame = Frame(callable_, inst.args)
+                args = list(map(partial(self.execute, runtime=False), inst.args))
+                with self._x.scope(frame), self._x.frame(frame):
+                    for argument, parameter in zip(args, callable_.parameters):
+                        self._x.local(str(parameter.name), argument, new=True)
 
                     last = None
                     for inst in callable_.body:
-                        last = self.execute(inst)
+                        last = self.execute(inst, runtime=False)
                     return last
 
         if not callable(callable_):
             self.state.error(f"The base interpreter may only execute native functions!", inst)
             return inst
 
-        return self.execute(callable_(*map(self.execute, inst.args)))
+        return self.execute(callable_(*map(partial(self.execute, runtime=False), inst.args)), runtime=False)
 
     @_exec
     def _(self, inst: RawCall):
-        callable_ = self.execute(inst.callable)
+        callable_ = self.execute(inst.callable, runtime=False)
 
         if callable_ is None:
             return inst
@@ -191,13 +215,17 @@ class Interpreter(StatefulProcessor):
             if len(inst.args) != len(callable_.parameters):
                 self.state.error(f"Function \"{callable_.name}\" was called with an improper amount of arguments")
             else:
-                with self._x.scope() as scope:
+                try:
+                    parent = self._x.frames[-1]
+                except IndexError:
+                    parent = self._x.global_scope
+                with self._x.scope(Scope(parent)) as scope, self._x.frame(scope):
                     for argument, parameter in zip(inst.args, callable_.parameters):
                         scope.name(str(parameter.name), argument)
 
                     last = None
                     for inst in callable_.body:
-                        last = self.execute(inst)
+                        last = self.execute(inst, runtime=False)
                     return last
 
         if not callable(callable_):
@@ -209,13 +237,13 @@ class Interpreter(StatefulProcessor):
     @_exec
     def _(self, fn: Function, *args, execute=False):
         if execute:
-            return self.execute(Call(fn, list(args)))
+            return self.execute(Call(fn, list(args)), runtime=False)
         return fn
 
     @_exec
     def _(self, inst: Name):
         result = self._x.local(inst.name)
-        if result is None:
+        if result is UNDEFINED:
             self.state.error(f"Could not resolve name \"{inst.name}\"", inst)
         return result
 
@@ -246,12 +274,12 @@ class Interpreter(StatefulProcessor):
     @_exec
     def _(self, _: DeleteName):
         result = self._x.local(_.name, strict=True)
-        if not self._x.local(_.name, None):
+        if not self._x.local(_.name, DELETE):
             self.state.error(f"Could not delete name \"{_.name}\" because it doesn't exist in the current scope", _)
         return result
 
     def __get_import_result(self, inst: Import):
-        source = self.execute(inst.source)
+        source = self.execute(inst.source, runtime=False)
         if isinstance(source, str):
             # raise TypeError(f"Import statement source must evaluate to a string, not \"{type(source)}\"")
 
@@ -267,4 +295,3 @@ class Interpreter(StatefulProcessor):
             return result
 
         return source  # todo: make sure is ImportResult
-

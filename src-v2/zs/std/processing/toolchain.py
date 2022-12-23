@@ -17,6 +17,7 @@ class Toolchain(StatefulProcessor):
     _tokenizer: Tokenizer
     _parser: Parser
     _interpreter: Interpreter
+    _preprocessor: Preprocessor
 
     def __init__(
             self,
@@ -33,6 +34,7 @@ class Toolchain(StatefulProcessor):
         self._parser = parser or Parser(state=self.state)
         # self._interpreter = interpreter or Interpreter(state=state, context=context)
         self._interpreter = interpreter or Interpreter(self.state)
+        self._preprocessor = Preprocessor(self.state)
 
     @property
     def tokenizer(self):
@@ -45,6 +47,10 @@ class Toolchain(StatefulProcessor):
     @property
     def interpreter(self):
         return self._interpreter
+
+    @property
+    def preprocessor(self):
+        return self._preprocessor
 
     @property
     def gcs(self):
@@ -70,10 +76,18 @@ class Toolchain(StatefulProcessor):
         with self._interpreter.x.scope() as scope, self._context.document(scope):
             # self._interpreter.execute_document(document.nodes)
 
-            preprocessor = Preprocessor(self.state)
-
-            for node in nodes:
-                self._interpreter.execute(preprocessor.preprocess(node))
+            try:
+                for node in nodes:
+                    self._interpreter.execute(self._preprocessor.preprocess(node), runtime=False)
+            except Exception as e:
+                print(50 * '-')
+                print(f"Caught exception '{type(e).__name__}' while processing node with token '{node}'.")
+                print(f"The node is a '{type(node).__name__}' node.")
+                print(f"File: {info.path}")
+                print()
+                print("Exception:", str(e))
+                print(50 * '-')
+                raise e
 
             # for name, item in self.interpreter.x._scope._items.items():
             #     document.add(item, name)

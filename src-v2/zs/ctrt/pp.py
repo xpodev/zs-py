@@ -20,7 +20,7 @@ class Preprocessor(StatefulProcessor):
         # self.state.warning(f"Preprocessing node {node}", node)
         if node is None:
             return node
-        return Call(Name(f"pp_{type(node).__name__}"), [node])
+        return Call(Name(f"exec_{type(node).__name__}"), [node])
         # return node
 
     _pp = _preprocess.register
@@ -34,7 +34,8 @@ class Preprocessor(StatefulProcessor):
         name = str(node.name.name) if node.name is not None else None
         init = Call(Name("Function", node_lib.Identifier(node.token_info.keyword_fun)), [
             name,
-            Call(Name("_._"), [Call(Name("_._"), [Call(Name("_._"), [Call(Name("_._"), [Name("__srf__"), "toolchain"]), "interpreter"]), "x"]), "local_scope"])
+            Call(Name("_._"), [Call(Name("_._"), [Call(Name("_._"), [Call(Name("_._"), [Name("__srf__"), "toolchain"]), "interpreter"]), "x"]), "local_scope"]),
+            node
         ], node)
 
         delete = name is None

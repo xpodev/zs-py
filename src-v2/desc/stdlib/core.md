@@ -26,7 +26,8 @@ It also defines the native types:
   - u64
   - I (native int)
   - U (native unsigned int)
+* Real numbers
   - f32 (single, float)
   - f64 (double)
-  - bool
-  - string (not a primitive, but has built-in support)
+* bool
+* string (not a primitive, but has built-in support)
