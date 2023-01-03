@@ -1,6 +1,5 @@
 from zs.ast.node_lib import Class
 from zs.processing import State
-from zs.std import List
 from zs.std.parsers.function import get_function
 from zs.std.parsers.misc import *
 from zs.text.parser import Parser, ContextualParser
@@ -27,7 +26,7 @@ def get_class(parser: Parser) -> Class:
     return Class(_class, name, _left_bracket, body, _right_bracket)
 
 
-class ClassBodyParser(ContextualParser[List[Node]]):
+class ClassBodyParser(ContextualParser[list[Node]]):
     def __init__(self, state: State):
         super().__init__(state, "ClassBody")
 

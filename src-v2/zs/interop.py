@@ -1,11 +1,8 @@
-from inspect import get_annotations
-from typing import TypeVar, Generic, Any
+from typing import TypeVar, Generic
 
 from zs.ast import node_lib
 from zs.base import Type, EmptyObject, Object, NativeFunction
 from zs.objects.common import TypedName
-from zs.std import Bool, String, List, Int32
-# from zs.std.objects.compilation_environment import ModuleMember, Module
 from zs.std.objects.function import Function
 
 _T = TypeVar("_T")

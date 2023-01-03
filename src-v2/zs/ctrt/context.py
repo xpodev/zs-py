@@ -7,6 +7,7 @@ SENTINEL = object()
 DELETE = object()
 UNDEFINED = object()
 
+
 class Scope(EmptyObject):
     _parent: Optional["Scope"]
     _items: dict[str, Object]

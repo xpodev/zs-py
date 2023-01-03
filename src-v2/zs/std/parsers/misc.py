@@ -2,7 +2,6 @@ from typing import overload, Generic, TypeVar, Callable
 
 from zs.ast.node import Node
 from zs.ast.node_lib import Identifier, TypedName, Tuple, Expression, Inlined, Alias, Import, Literal, Var
-from zs.std import String, Bool, List, Int32
 from zs.text.parser import SubParser, Parser
 from zs.text.token import TokenType, Token
 
@@ -15,27 +14,27 @@ class _SubParserWrapper(SubParser, Generic[_T]):
         super().__init__(*args, **kwargs)
 
     @overload
-    def __call__(self, parser: Parser) -> _T | None: ...
+    def __call__(self, parser: Parser, **kwargs) -> _T | None: ...
     @overload
-    def __call__(self, parser: Parser, left: Node) -> _T | None: ...
+    def __call__(self, parser: Parser, left: Node, **kwargs) -> _T | None: ...
 
-    def __call__(self, parser: Parser, left: None = None) -> _T | None:
+    def __call__(self, parser: Parser, left: None = None, **kwargs) -> _T | None:
         if left is None:
-            return self.nud(parser)
-        return self.led(parser, left)
+            return self.nud(parser, **kwargs)
+        return self.led(parser, left, **kwargs)
 
 
 def _is_not(a, b, v=None):
     return a if a is not v else b
 
 
-def subparser(token: TokenType | str | String) -> Callable[[Callable[[Parser], _T]], _SubParserWrapper[_T]]:
+def subparser(token: TokenType | str) -> Callable[[Callable[[Parser], _T]], _SubParserWrapper[_T]]:
     def wrapper(fn: Callable[[Parser], _T]):
         return _SubParserWrapper(-1, token, nud=fn)
     return wrapper
 
 
-def modifier(name: str | String):
+def modifier(name: str):
     def wrapper(fn: Callable[[Token, _T], _U]):
         @subparser
         def parse(parser: Parser) -> _U:
@@ -56,7 +55,7 @@ def literal(token: TokenType) -> _SubParserWrapper[Literal]:
     return wrapper
 
 
-def separated(token: str | String | TokenType, binding_power: int | Int32, context: type | str = None):
+def separated(token: str | TokenType, binding_power: int, context: type | str = None):
     def wrapper(parser: Parser, left):
         if not parser.token(token):
             return [left] if not isinstance(left, list) else left
@@ -74,8 +73,8 @@ def separated(token: str | String | TokenType, binding_power: int | Int32, conte
 def copy_with(
         original: SubParser,
         *,
-        binding_power: int | Int32 = None,
-        token: str | String | TokenType = None,
+        binding_power: int = None,
+        token: str | TokenType = None,
         nud: Callable[[Parser], Node] = None,
         led: Callable[[Parser, Node], Node] = None
 ) -> SubParser:
@@ -95,7 +94,7 @@ def get_identifier(parser: Parser):
     return Identifier(parser.eat(TokenType.Identifier))
 
 
-def get_typed_name(parser: Parser, must_be_typed: bool | Bool = False):
+def get_typed_name(parser: Parser, must_be_typed: bool = False):
     name = get_identifier(parser)
 
     if not must_be_typed and not parser.token(':'):
@@ -143,7 +142,7 @@ def get_import(parser: Parser):
             _import, None, None, None, None, Literal(parser.eat(TokenType.String)), parser.eat(";")
         )
     else:
-        imported_names: List[Identifier | Alias] | Identifier | Alias = List()
+        imported_names: list[Identifier | Alias] | Identifier | Alias = []
 
     _l_curly = _r_curly = None
     if parser.token("{"):
@@ -154,7 +153,7 @@ def get_import(parser: Parser):
             if parser.token("as"):
                 name = Alias(name, parser.eat("as"), get_identifier(parser))
 
-            imported_names.add(name)
+            imported_names.append(name)
 
             if not parser.token("}"):
                 parser.eat(",")

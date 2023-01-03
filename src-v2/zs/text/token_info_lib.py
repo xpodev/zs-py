@@ -51,6 +51,30 @@ class Binary(TokenInfo):
 
 
 @dataclass(**_cfg)
+class Block(TokenInfo):
+    """
+    Token info for statement blocks
+
+    '{' STATEMENTS* '}'
+    """
+
+    left_bracket: Token
+    right_bracket: Token
+
+
+@dataclass(**_cfg)
+class Break(TokenInfo):
+    """
+    Token info for the break statement:
+
+    'break' EXPRESSION? ';'
+    """
+    keyword_break: Token
+
+    semicolon: Token
+
+
+@dataclass(**_cfg)
 class Class(TokenInfo):
     """
     Token info for the 'class' node:
@@ -65,11 +89,33 @@ class Class(TokenInfo):
 
 
 @dataclass(**_cfg)
+class Continue(TokenInfo):
+    """
+    Token info for the break statement:
+
+    'continue' EXPRESSION? ';'
+    """
+    keyword_continue: Token
+
+    semicolon: Token
+
+
+@dataclass(**_cfg)
+class ExpressionStatement(TokenInfo):
+    """
+    Token info for the expression statement node:
+
+    EXPRESSION ';'
+    """
+    semicolon: Token
+
+
+@dataclass(**_cfg)
 class Function(TokenInfo):
     """
     Token info for the 'fun' node:
 
-    'fun' NAME? '(' ARGS ')' (':' EXPR)? CLAUSE* EXPRESSION
+    'fun' NAME? '(' ARGS ')' (':' EXPR)? (('{' STATEMENTS* '}') | ';')
     """
 
     keyword_fun: Token
@@ -186,6 +232,12 @@ class Module(TokenInfo):
 
 
 @dataclass(**_cfg)
+class Return(TokenInfo):
+    keyword_return: Token
+    semicolon: Token
+
+
+@dataclass(**_cfg)
 class Tuple(TokenInfo):
     """
     Token info for the 'tuple' node:
@@ -219,3 +271,43 @@ class Var(TokenInfo):
     var: Token
     assign: Token | None
 
+
+@dataclass(**_cfg)
+class When(TokenInfo):
+    """
+    Token info for the 'when' structure:
+
+    'when' NAME? '(' EXPRESSION ')' '{' CASE* '}' ('else' STATEMENT)?
+    """
+    keyword_when: Token
+
+    left_parenthesis: Token
+    right_parenthesis: Token
+
+    left_bracket: Token
+    right_bracket: Token
+
+    keyword_else: Token | None
+
+    @dataclass(**_cfg)
+    class Case(TokenInfo):
+        """
+        Token info for the 'case' structure (for the 'when' structure):
+
+        'case' '(' EXPRESSION ')' '{' STATEMENTS '}'
+        """
+
+        keyword_case: Token
+
+        left_parenthesis: Token
+        right_parenthesis: Token
+
+
+@dataclass(**_cfg)
+class While(TokenInfo):
+    keyword_while: Token
+
+    left_parenthesis: Token
+    right_parenthesis: Token
+
+    keyword_else: Token

@@ -3,11 +3,9 @@ from typing import Iterable, Optional, TypeVar, Generic, Any
 
 from ... import EmptyObject, Object
 from ...ast import node_lib
-from .wrappers import List, String, Dictionary, Bool
 from ...ast.node import Node
 from ...base import Null
 from ...errors import UnnamedObjectError, DuplicateDefinitionError, UndefinedNameError
-from ...interop import zs_function, zs_type
 from ...text.file_info import DocumentInfo
 
 
@@ -19,7 +17,7 @@ class IScope:
     def parent(self):
         return
 
-    def add(self, value: Object, name: str | String = None, reference: bool | Bool = False):
+    def add(self, value: Object, name: str = None, reference: bool = False):
         """
         Add a new item to the scope.
         If an item with the same name already exists it will be added to the existing item via the += operator.
@@ -29,7 +27,7 @@ class IScope:
         """
         ...
 
-    def get(self, name: str | String) -> Object:
+    def get(self, name: str) -> Object:
         """
         Searches the scope for the given name and returns the object associated with it.
         if no such object exists, raise an `UndefinedNameError`
@@ -37,7 +35,7 @@ class IScope:
         This function should support the __get__ special method.
         """
 
-    def set(self, name: str | String, value: Object):
+    def set(self, name: str, value: Object):
         """
         Set a new value to associate with the given name.
 
@@ -66,11 +64,10 @@ class Scope(Object[_T], Generic[_T], IScope):
     def values(self):
         return self._map.values()
 
-    def add(self, value: Object, name: str | String = None, reference: bool | Bool = False):
+    def add(self, value: Object, name: str = None, reference: bool = False):
         name = name or getattr(value, "name")
         if name is None:
             raise UnnamedObjectError(value, f"Can't add an unnamed object to the context")
-        name = str(name)
         if name in self._map:
             try:
                 self._map[name] += value
@@ -79,14 +76,13 @@ class Scope(Object[_T], Generic[_T], IScope):
         else:
             self._map[name] = value
 
-    def get(self, name: str | String):
+    def get(self, name: str):
         try:
-            return self._map[str(name)]
+            return self._map[name]
         except KeyError:
             raise UndefinedNameError(name, self)
 
-    def set(self, name: str | String, value: Object):
-        name = str(name)
+    def set(self, name: str, value: Object):
         if name not in self._map:
             raise UndefinedNameError(name, self)
         else:
@@ -99,12 +95,12 @@ class Scope(Object[_T], Generic[_T], IScope):
 class Document(Scope):
     _info: DocumentInfo
     _module: "Module"
-    _nodes: List[Node]
+    _nodes: list[Node]
 
     def __init__(self, info: DocumentInfo | None, nodes: Iterable[Node]):
         super().__init__()
         self._info = info
-        self._nodes = List(nodes)
+        self._nodes = list(nodes)
 
     @property
     def info(self):
@@ -119,25 +115,24 @@ class Document(Scope):
         return self._nodes
 
 
-@zs_type()
 class Module(Scope[node_lib.Module]):
-    _name: String
-    _documents: List[Document]
+    _name: str
+    _documents: list[Document]
     _members: Scope
-    _exported_items: Dictionary[String, Object]
+    _exported_items: dict[str, Object]
     _parent: Optional["Module"]
     _entry_point: Any  # type: Optional["Function"]  # why do I need to trick the IDE tho :/
 
-    def __init__(self, name: str | String, node: node_lib.Module = None, parent: "Module" = None):
+    def __init__(self, name: str, node: node_lib.Module = None, parent: "Module" = None):
         if parent is None:
             super().__init__(node, this=self)
         else:
             super().__init__(node, this=self, base=parent)
-        self._name = String(name)
+        self._name = name
         self._parent = parent
-        self._documents = List()
+        self._documents = []
         self._members = Scope()
-        self._exported_items = Dictionary()
+        self._exported_items = {}
         self._entry_point = Null
 
     @property
@@ -160,7 +155,7 @@ class Module(Scope[node_lib.Module]):
     def entry_point(self, value):
         self._entry_point = value
 
-    def add(self, item: Object, name: str | String = None, reference: bool | Bool = False, export: bool | Bool = False):
+    def add(self, item: Object, name: str = None, reference: bool = False, export: bool = False):
         if not reference:
             self._members.add(item, name, reference)
 
@@ -172,15 +167,14 @@ class Module(Scope[node_lib.Module]):
 
         if export:
             # todo: make scope instead of regular dictionary
-            self._exported_items[String(name)] = item
+            self._exported_items[name] = item
 
     def add_document(self, document: Document):
         if document.module is not None:
             raise ValueError(f"Document is already inside a module")
         document._module = self
-        self._documents.add(document)
+        self._documents.append(document)
 
-    @zs_function()
     def set_entry_point(self, entry_point):
         self.entry_point = entry_point
 
@@ -306,7 +300,7 @@ class ContextManager(EmptyObject):
         finally:
             self._scopes.pop()
 
-    def add(self, item: Object, name: str | String = None):
+    def add(self, item: Object, name: str = None):
         self.current_scope.add(item, name)
 
     def get_nodes_from_cached(self, path: str) -> list[Node] | None:
@@ -315,7 +309,7 @@ class ContextManager(EmptyObject):
         except KeyError:
             return None
 
-    def __getitem__(self, name: str | String) -> Object:
+    def __getitem__(self, name: str) -> Object:
         for scope in reversed(self._scopes):
             try:
                 return scope.get(name)
@@ -323,7 +317,7 @@ class ContextManager(EmptyObject):
                 ...
         raise UndefinedNameError(name, self.current_scope)
 
-    def __setitem__(self, name: str | String, value: Object):
+    def __setitem__(self, name: str, value: Object):
         for scope in reversed(self._scopes):
             try:
                 scope.set(name, value)

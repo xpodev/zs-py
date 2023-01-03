@@ -1,7 +1,6 @@
 from zs.ast.node import Node
 from zs.ast.node_lib import Identifier, Import, Alias, Literal, Expression, Function, TypedName, Parameter, FunctionCall, Binary, MemberAccess, Assign
 from zs.processing import State
-from zs.std.objects.wrappers import Int32, List
 from zs.std.parsers.misc import get_identifier, get_tuple, get_string, separated, copy_with
 from zs.text.parser import ContextualParser, SubParser, Parser
 from zs.text.token import TokenType, Token
@@ -44,7 +43,7 @@ class ExpressionParser(ContextualParser[Expression]):
 
         self.symbol(TokenType.EOF)
 
-    def parse(self, parser: Parser, binding_power: Int32) -> Expression:
+    def parse(self, parser: Parser, binding_power: int) -> Expression:
         self._stream = parser.stream
 
         return super().parse(parser, binding_power)

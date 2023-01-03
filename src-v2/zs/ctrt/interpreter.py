@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from functools import singledispatchmethod, partial
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from zs.processing import State, StatefulProcessor
 from .context import Scope, DELETE, UNDEFINED
@@ -221,7 +221,7 @@ class Interpreter(StatefulProcessor):
                     parent = self._x.global_scope
                 with self._x.scope(Scope(parent)) as scope, self._x.frame(scope):
                     for argument, parameter in zip(inst.args, callable_.parameters):
-                        scope.name(str(parameter.name), argument)
+                        scope.name(str(parameter.name), argument, new=True)
 
                     last = None
                     for inst in callable_.body:
@@ -284,6 +284,8 @@ class Interpreter(StatefulProcessor):
             # raise TypeError(f"Import statement source must evaluate to a string, not \"{type(source)}\"")
 
             path = Path(str(source))
+            if not path.suffixes:
+                path /= f"{path.stem}.module.zs"
 
             result = self._import_system.import_from(path)
 

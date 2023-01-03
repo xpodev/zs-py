@@ -3,7 +3,6 @@ from typing import Iterable
 
 from zs import EmptyObject, Object
 from zs.ast.node_lib import Import
-from zs.std import String, List, Dictionary
 
 
 class ImportResult(Object[Import]):
@@ -30,28 +29,27 @@ class Importer(EmptyObject):
 
 
 class ImportSystem(Importer):
-    _path: List[String]
-    _importers: Dictionary[String, Importer]
-    _directory_importers: List[Importer]
+    _path: list[str]
+    _importers: dict[str, Importer]
+    _directory_importers: list[Importer]
 
     def __init__(self):
         super().__init__()
-        self._path = List()
-        self._importers = Dictionary()
-        self._directory_importers = List()
+        self._path = []
+        self._importers = {}
+        self._directory_importers = []
 
-    def add_directory(self, path: str | String | Path):
-        path = Path(str(path))
+    def add_directory(self, path: str | Path):
+        path = Path(path)
         if not path.is_dir():
             raise ValueError(f"Can only add directories to search path")
         if not path.is_absolute():
             path = self.resolve(path)
         if path is None:
             raise ValueError(f"Could not find path")
-        self._path.add(String(str(path)))
+        self._path.append(str(path))
 
-    def add_importer(self, importer: Importer, ext: str | String):
-        ext = String(ext)
+    def add_importer(self, importer: Importer, ext: str):
         if ext in self._importers:
             raise ValueError(f"Importer for \"{ext}\" already exists")
 
@@ -60,7 +58,7 @@ class ImportSystem(Importer):
 
         self._importers[ext] = importer
         if importer.import_directory is not None:
-            self._directory_importers.add(importer)
+            self._directory_importers.append(importer)
 
     def import_directory(self, path: Path) -> ImportResult | None:
         for importer in self._directory_importers:
@@ -70,7 +68,7 @@ class ImportSystem(Importer):
 
     def import_file(self, path: Path) -> ImportResult | None:
         try:
-            return self._importers[String(path.suffix)].import_file(path)
+            return self._importers[path.suffix].import_file(path)
         except KeyError as e:
             return None
 

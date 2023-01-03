@@ -11,10 +11,8 @@ __all__ = [
     "TokenStream",
 ]
 
-from zs.std.objects.wrappers import Int32
 
-
-class SeekMode(Int32, Enum):
+class SeekMode(int, Enum):
     Start = 0
     Current = 1
     End = 2
@@ -23,11 +21,13 @@ class SeekMode(Int32, Enum):
 class TokenStream(EmptyObject):
     _tokens: list[Token]
     _current: int
+    _file: str
 
-    def __init__(self, tokens: Iterable[Token]):
+    def __init__(self, tokens: Iterable[Token], file):
         super().__init__()
         self._tokens = list(filter(lambda t: not t.is_whitespace, tokens))
         self._current = 0
+        self._file = file
 
     @property
     def end(self):
@@ -36,6 +36,10 @@ class TokenStream(EmptyObject):
     @property
     def token(self) -> Token:
         return self._tokens[self._current]
+
+    @property
+    def file(self):
+        return self._file
 
     def peek(self, next_: int = 0) -> Token:
         return self._tokens[self._current + next_]

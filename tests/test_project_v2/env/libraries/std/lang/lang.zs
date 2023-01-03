@@ -74,14 +74,6 @@ var __impl_if__ctx = codegen(fun(ctx, condition, true_, false_) {
 })
 
 
-
-var __impl_while = codegen(fun(condition, body) {
-    fun rec(body_, condition_) {
-       if(condition_, fun() { __srf__.toolchain.interpreter.execute(body_); rec(body_, condition_) }(), fun() {}())
-    }(body, condition)
-})
-
-
 var __impl_with = codegen(fun(context, body) {
     fun(cm) {
         cm.__enter__();
@@ -108,7 +100,7 @@ fun equals(x, y) {
 fun empty() {}
 
 
-fun __exec__(node) {
+var __exec__ = fun(node) {
     __srf__.toolchain.interpreter.execute(
         __srf__.toolchain.preprocessor.preprocess(
             node
@@ -116,53 +108,6 @@ fun __exec__(node) {
     )
 }
 
-
-var _node__if = create_type("_node__if")
-
-fun exec__node__if(node) {
-    __srf__.toolchain.interpreter.execute(
-        __srf__.toolchain.preprocessor.preprocess(
-            __impl_if(node.condition, node.body, __impl_if(equals(node.else, Python.None), empty(), node.else))
-        )
-    )
+fun __pexec__(node) {
+    __srf__.toolchain.interpreter.execute(node)
 }
-
-
-var __parser_if = Object()
-setattr(__parser_if, "nud", fun(parser) {
-    fun(node) {
-        parser.eat("if");
-        parser.eat("(");
-        setattr(node, "condition", parser.next("Expression"));
-        parser.eat(Python.builtins.chr(41));
-        parser.eat("{");
-        setattr(node, "body", parser.next("Expression"));
-        parser.eat(Python.builtins.chr(125));
-        __srf__.toolchain.interpreter.execute(__impl_if(
-            parser.token("else"),
-            fun() {
-                parser.eat("else");
-                parser.eat("{");
-                setattr(node, "else", parser.next("Expression"));
-                parser.eat(Python.builtins.chr(125))
-            }(),
-            fun() {
-                setattr(node, "else", Python.None)
-            }()
-        ));
-        node
-    }(_node__if())
-})
-setattr(__parser_if, "binding_power", 0)
-setattr(__parser_if, "token", "if")
-__srf__.toolchain.parser.get("Document").add_parser(__parser_if)
-
-
-var _node__while = create_type("_node__while")
-
-var _parser_while = Object()
-setattr(_parser_while, "nud", fun(parser) {
-    fun(node) {
-
-    }(_node__while())
-})

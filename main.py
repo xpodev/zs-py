@@ -1,16 +1,16 @@
 import sys
 
-from functools import partial, partialmethod
+from functools import partial
 from pathlib import Path
 from typing import Callable
 
-from zs.base import NativeFunction
 from zs.cli.options import Options, get_options
-from zs.ctrt.lib import Function, ExObj, Field, CodeGenFunction
+from zs.ctrt.lib import ExObj
+from zs.ctrt.objects import NativeFunction
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter
 from zs.std.objects.compilation_environment import Document, ContextManager
-from zs.std.parsers.std import get_standard_parser
+from zs.std.parsers import base as base_language
 from zs.std.processing.import_system import ImportResult
 from zs.std.processing.toolchain import Toolchain
 
@@ -57,6 +57,7 @@ class Compiler(StatefulProcessor):
         if path.is_dir():
             toolchain = self._toolchain_factory(self)
             self._toolchain = toolchain
+            path /= f"{path.name}.module.zs"
         else:
             toolchain = self._toolchain
 
@@ -67,7 +68,7 @@ def main(options: Options):
     state = State()
     context = ContextManager()
 
-    parser = get_standard_parser(state)
+    parser = base_language.get_parser(state)
 
     parser.setup()
 
@@ -75,45 +76,52 @@ def main(options: Options):
     import_system = compiler.toolchain.interpreter.import_system
     context.global_context.add(compiler, "__srf__")
 
-    import_system.add_directory("./tests/test_project_v2/")
+    import_system.add_directory(Path(options.source).parent.resolve())
 
     import_system.add_importer(ZSImporter(import_system, compiler), ".zs")
 
     builtins = compiler.builtins
 
-    def _assign(left, right):
-        if isinstance(left, Field):
-            return left.set(right)
-        if isinstance(left, str):
-            compiler.toolchain.interpreter.x.local(left, right)
+    for name in vars(__builtins__):
+        item = getattr(__builtins__, name)
+        if callable(item):
+            setattr(builtins, name, NativeFunction(item))
 
-    def _set(obj, n, value):
-        o = compiler.toolchain.interpreter.execute(obj, runtime=False)
-        v = compiler.toolchain.interpreter.execute(value, runtime=False)
-        setattr(o, str(n), v)
-        return v
+    compiler.toolchain.interpreter.x.global_scope.add_local("Python", builtins)
 
-    def _get(obj, n):
-        try:
-            return getattr(obj, str(n))
-        except AttributeError:
-            ...
+    # def _assign(left, right):
+    #     if isinstance(left, Field):
+    #         return left.set(right)
+    #     if isinstance(left, str):
+    #         compiler.toolchain.interpreter.x.local(left, right)
+    #
+    # def _set(obj, n, value):
+    #     o = compiler.toolchain.interpreter.execute(obj, runtime=False)
+    #     v = compiler.toolchain.interpreter.execute(value, runtime=False)
+    #     setattr(o, str(n), v)
+    #     return v
+    #
+    # def _get(obj, n):
+    #     try:
+    #         return getattr(obj, str(n))
+    #     except AttributeError:
+    #         ...
 
-    builtins.CodeGenFunction = CodeGenFunction
-    builtins.Function = Function
-    builtins.Object = ExObj
-    builtins.getattr = NativeFunction(lambda o, n: _get)
-    builtins.setattr = NativeFunction(lambda o, n, v: _set(o, n, v))
-    builtins.print = NativeFunction(lambda *args, **kwargs: print(*args, **{
-        n: compiler.toolchain.interpreter.execute(value) for n, value in kwargs.items()
-    }))
-    builtins.partial = partial
-    builtins.partialmethod = partialmethod
-
-    compiler.toolchain.interpreter.x.local("__srf__", compiler)
-    compiler.toolchain.interpreter.x.local("_._", _get)
-    compiler.toolchain.interpreter.x.local("_=_", _assign)
-    compiler.toolchain.interpreter.x.local("_;_", lambda l, r: (compiler.toolchain.interpreter.execute(l, runtime=False), compiler.toolchain.interpreter.execute(r, runtime=False))[1])
+    # builtins.CodeGenFunction = CodeGenFunction
+    # builtins.Function = Function
+    # builtins.Object = ExObj
+    # builtins.getattr = NativeFunction(lambda o, n: _get)
+    # builtins.setattr = NativeFunction(lambda o, n, v: _set(o, n, v))
+    # builtins.print = NativeFunction(lambda *args, **kwargs: print(*args, **{
+    #     n: compiler.toolchain.interpreter.execute(value) for n, value in kwargs.items()
+    # }))
+    # builtins.partial = partial
+    # builtins.partialmethod = partialmethod
+    #
+    # compiler.toolchain.interpreter.x.frame.add_local("__srf__", compiler)
+    # compiler.toolchain.interpreter.x.frame.add_local("_._", _get)
+    # compiler.toolchain.interpreter.x.frame.add_local("_=_", _assign)
+    # compiler.toolchain.interpreter.x.frame.add_local("_;_", lambda l, r: (compiler.toolchain.interpreter.execute(l, runtime=False), compiler.toolchain.interpreter.execute(r, runtime=False))[1])
 
     try:
         compiler.compile(options.source)

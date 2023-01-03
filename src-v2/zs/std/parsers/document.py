@@ -1,7 +1,6 @@
 from zs.ast.node import Node
 from zs.ast.node_lib import Identifier, Import, Alias, Literal, Expression
 from zs.processing import State
-from zs.std.objects.wrappers import Int32, List
 from zs.std.parsers.function import get_function
 from zs.std.parsers.misc import get_inlined, get_import
 from zs.std.parsers.module import get_module
@@ -20,7 +19,7 @@ def _bind(fn):
     return lambda _, *args: fn(*args)
 
 
-class DocumentParser(ContextualParser[List[Node]]):
+class DocumentParser(ContextualParser[list[Node]]):
     """
     A parser that can parse the body of a Z# document. It outputs a list of nodes representing the nodes in the document.
     """
@@ -35,7 +34,7 @@ class DocumentParser(ContextualParser[List[Node]]):
 
         self.symbol(TokenType.EOF)
 
-    def parse(self, parser: Parser, binding_power: Int32):
+    def parse(self, parser: Parser, binding_power: int):
         self._parser = parser
         self._stream = parser.stream
 

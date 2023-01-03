@@ -1,6 +1,5 @@
 from typing import TypeVar, Generic, Optional, Union
 
-from zs.std.objects.wrappers import List, String
 from ..text import token_info_lib as token_info
 from ..text.token import Token
 from .node import Node
@@ -68,6 +67,27 @@ class Binary(Expression[token_info.Binary]):
         self.right = right
 
 
+class Block(Node[token_info.Block]):
+    statements: list[Node]
+
+    def __init__(
+            self,
+            _left_bracket: Token,
+            statements: list[Node],
+            _right_bracket: Token
+    ):
+        super().__init__(token_info.Block(_left_bracket, _right_bracket))
+        self.statements = statements
+
+
+class Break(Node[token_info.Break]):
+    loop: Expression | None
+
+    def __init__(self, _break: Token, loop: Expression | None, _semicolon: Token):
+        super().__init__(token_info.Break(_break, _semicolon))
+        self.loop = loop
+
+
 class Class(Node[token_info.Class]):  # todo
     """
     AST node for the 'class' construct
@@ -77,7 +97,7 @@ class Class(Node[token_info.Class]):  # todo
 
     name: Optional["Identifier"]
 
-    items: List[Node]
+    items: list[Node]
 
     def __init__(
             self,
@@ -89,7 +109,23 @@ class Class(Node[token_info.Class]):  # todo
     ):
         super().__init__(token_info.Class(_class, _left_parenthesis, _right_parenthesis))
         self.name = name
-        self.items = List(items)
+        self.items = items
+
+
+class Continue(Node[token_info.Continue]):
+    loop: Expression | None
+
+    def __init__(self, _continue: Token, loop: Expression | None, _semicolon: Token):
+        super().__init__(token_info.Continue(_continue, _semicolon))
+        self.loop = loop
+
+
+class ExpressionStatement(Node[token_info.ExpressionStatement]):
+    expression: Expression
+
+    def __init__(self, expression: Expression, _semicolon: Token):
+        super().__init__(token_info.ExpressionStatement(_semicolon))
+        self.expression = expression
 
 
 class Field(Node[None]):  # todo
@@ -112,13 +148,11 @@ class Function(Expression[token_info.Function]):
 
     name: Optional["Identifier"]
 
-    parameters: List["TypedName"]
+    parameters: list["TypedName"]
 
     return_type: Expression
 
-    clauses: List[Union["WhenClause", "WhereClause"]]
-
-    body: list  # Expression | None
+    body: list[Node] | None  # Expression | None
 
     def __init__(
             self,
@@ -129,14 +163,14 @@ class Function(Expression[token_info.Function]):
             _right_parenthesis: Token,
             _colon: Token,
             return_type: Expression | None,
-            clauses: list[Union["WhenClause", "WhereClause"]],
-            body: Expression | None
+            _left_bracket: Token | None,
+            body: list[Node] | None,
+            _right_bracket: Token | None
     ):
         super().__init__(token_info.Function(_fun, _left_parenthesis, _right_parenthesis, _colon))
         self.name = name
-        self.parameters = List(parameters)
+        self.parameters = parameters
         self.return_type = return_type
-        self.clauses = List(clauses)
         self.body = body
 
 
@@ -148,7 +182,7 @@ class FunctionCall(Expression[token_info.FunctionCall]):
     """
 
     callable: Expression
-    arguments: List[Expression]
+    arguments: list[Expression]
 
     def __init__(
             self,
@@ -159,7 +193,7 @@ class FunctionCall(Expression[token_info.FunctionCall]):
     ):
         super().__init__(token_info.FunctionCall(_left_parenthesis, _right_parenthesis))
         self.callable = callable_
-        self.arguments = List(arguments)
+        self.arguments = arguments
 
 
 class Identifier(Expression[token_info.Identifier]):
@@ -167,11 +201,11 @@ class Identifier(Expression[token_info.Identifier]):
     AST node for identifiers.
     """
 
-    name: String
+    name: str
 
     def __init__(self, name: Token):
         super().__init__(token_info.Identifier(name))
-        self.name = String(name.value)
+        self.name = name.value
 
 
 class If(Expression[token_info.If]):
@@ -186,8 +220,8 @@ class If(Expression[token_info.If]):
 
     condition: Expression
 
-    if_true: Expression
-    if_false: Expression | None
+    if_true: Node
+    if_false: Node | None
 
     def __init__(
             self,
@@ -196,9 +230,9 @@ class If(Expression[token_info.If]):
             _left_parenthesis: Token,
             condition: Expression,
             _right_parenthesis: Token,
-            if_true: Expression,
+            if_true: Node,
             _else: Token | None,
-            if_false: Expression | None
+            if_false: Node | None
     ):
         super().__init__(token_info.If(_if, _left_parenthesis, _right_parenthesis, _else))
         self.name = name
@@ -214,14 +248,14 @@ class Import(Node[token_info.Import]):
     'import' (('*' | NAME | ALIAS) 'from')? SOURCE ';'
     """
 
-    name: List[Identifier | Alias] | Alias | Identifier | None
+    name: list[Identifier | Alias] | Alias | Identifier | None
     source: Expression
 
     def __init__(
             self,
             _import: Token,
             _left_parenthesis: Token | None,
-            name: List[Identifier | Alias] | Alias | Identifier | None,
+            name: list[Identifier | Alias] | Alias | Identifier | None,
             _right_parenthesis: Token | None,
             _from: Token | None,
             source: Expression,
@@ -282,8 +316,8 @@ class Module(Node[token_info.Module]):
     'module' IDENTIFIER ('.' IDENTIFIER)* ('{' ITEMS '}') | ';'
     """
 
-    name: String
-    items: List[Node] | None
+    name: str
+    items: list[Node] | None
 
     def __init__(
             self,
@@ -296,7 +330,7 @@ class Module(Node[token_info.Module]):
     ):
         super().__init__(token_info.Module(_module, _left_bracket, _right_bracket, _semicolon))
         self.name = name.name
-        self.items = List(items) if items is not None else items
+        self.items = items if items is not None else items
 
 
 class Parameter(Node[None]):  # todo
@@ -321,6 +355,19 @@ class Property(Node[None]):  # todo
         super().__init__(None)  # todo
 
 
+class Return(Node[token_info.Return]):
+    expression: Expression | None
+
+    def __init__(
+            self,
+            _return: Token,
+            expression: Expression | None,
+            _semicolon: Token
+    ):
+        super().__init__(token_info.Return(_return, _semicolon))
+        self.expression = expression
+
+
 class Tuple(Expression[token_info.Tuple]):
     """
     AST node for a tuple
@@ -328,11 +375,11 @@ class Tuple(Expression[token_info.Tuple]):
     '(' EXPRESSIONS ')'
     """
 
-    items: List[Expression]
+    items: list[Expression]
 
     def __init__(self, _left_parenthesis: Token, items: list[Expression], _right_parenthesis: Token):
         super().__init__(token_info.Tuple(_left_parenthesis, _right_parenthesis))
-        self.items = List(items)
+        self.items = items
 
 
 class TypedName(Node[token_info.TypedName]):
@@ -359,3 +406,80 @@ class Var(Node[token_info.Var]):
         super().__init__(token_info.Var(_var, _assign))
         self.name = name
         self.initializer = initializer
+
+
+class When(Node[token_info.When]):
+    class Case(Node[token_info.When.Case]):
+        expression: Expression
+        body: Node
+
+        def __init__(
+                self,
+                _case: Token,
+                _left_parenthesis: Token,
+                expression: Expression,
+                _right_parenthesis: Token,
+                body: Node,
+        ):
+            super().__init__(token_info.When.Case(
+                _case,
+                _left_parenthesis,
+                _right_parenthesis
+            ))
+            self.expression = expression
+            self.body = body
+
+    name: Identifier | None
+    expression: Expression
+    cases: list[Case]
+    else_body: Node
+
+    def __init__(
+            self,
+            _when: Token,
+            name: Identifier | None,
+            _left_parenthesis: Token,
+            expression: Expression,
+            _right_parenthesis: Token,
+            _left_bracket: Token,
+            cases: list[Case],
+            _right_bracket: Token,
+            _else: Token | None,
+            else_body: Node | None
+    ):
+        super().__init__(token_info.When(
+            _when,
+            _left_parenthesis,
+            _right_parenthesis,
+            _left_bracket,
+            _right_bracket,
+            _else
+        ))
+        self.name = name
+        self.expression = expression
+        self.cases = cases
+        self.else_body = else_body
+
+
+class While(Node[token_info.While]):
+    name: Identifier | None
+    condition: Expression
+    body: Node
+    else_body: Node | None
+
+    def __init__(
+            self,
+            _keyword_while: Token,
+            name: Identifier | None,
+            _left_parenthesis: Token,
+            condition: Expression,
+            _right_parenthesis: Token,
+            body: Node,
+            _else: Token,
+            else_body: Node | None
+    ):
+        super().__init__(token_info.While(_keyword_while, _left_parenthesis, _right_parenthesis, _else))
+        self.name = name
+        self.condition = condition
+        self.body = body
+        self.else_body = else_body

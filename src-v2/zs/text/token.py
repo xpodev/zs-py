@@ -2,7 +2,6 @@ from enum import Enum
 
 from .file_info import Span
 from .. import EmptyObject
-from zs.std.objects.wrappers import String
 
 
 __all__ = [
@@ -12,7 +11,7 @@ __all__ = [
 ]
 
 
-class TokenCategory(String, Enum):
+class TokenCategory(str, Enum):
     WS = "WS"
     Misc = "Misc"
     Term = "Term"
@@ -24,7 +23,7 @@ class TokenCategory(String, Enum):
         return self.value
 
 
-class TokenType(String, Enum):
+class TokenType(str, Enum):
     Space = f"{TokenCategory.WS}.Space"
     NewLine = f"{TokenCategory.WS}.EOL"
     Tab = f"{TokenCategory.WS}.Tab"
@@ -98,9 +97,9 @@ class TokenType(String, Enum):
 class Token(EmptyObject):
     _type: TokenType
     _span: Span
-    _value: String
+    _value: str
 
-    def __init__(self, type_: TokenType, value: String, span: Span):
+    def __init__(self, type_: TokenType, value: str, span: Span):
         super().__init__()
         self._span = span
         self._value = value
@@ -144,7 +143,7 @@ class Token(EmptyObject):
     def __eq__(self, other):
         if isinstance(other, TokenType):
             return self._type == other
-        if isinstance(other, (String, str)):
+        if isinstance(other, str):
             return self._value == other
         else:
             raise TypeError(f"Can't compare between types: {Token} and {type(other)}")
