@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar, TYPE_CHECKING
+from typing import Generic, TypeVar
 
 from ..text.token_info import TokenInfo
 
@@ -13,11 +13,6 @@ class Node(Generic[TokenInfoT]):
 
     def __init__(self, token_info: TokenInfoT):
         self._token_info = token_info
-
-    if TYPE_CHECKING:  # this is here for better typing
-        @property
-        def node(self: _T) -> _T:
-            return self
 
     @property
     def token_info(self):
