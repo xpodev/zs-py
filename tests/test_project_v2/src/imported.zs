@@ -1,3 +1,0 @@
-fun imported() {
-    imported(Main)
-}

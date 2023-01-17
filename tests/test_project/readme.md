@@ -43,5 +43,14 @@ be placed in the `{project_dir}` directory instead of in the `src` directory.
     of your program (i.e. the `Main` function).
 
 `{project_dir}.main.zs` - Module file. This file runs first and is responsible
-    for running the setup file and adding all of the source files to the compilation
+    for running the setup file and adding all the source files to the compilation
     process.
+
+
+## Syntax
+As of the current implementation, the compiler treats every Z# document as a
+single expression. Due to that, a weird consequence is that every 2 items must be
+separated by a semicolon, and the last item must not have a semicolon at the end.
+
+
+
