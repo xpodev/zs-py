@@ -3,5 +3,4 @@
 /.lh
 /.idea
 /poetry.lock
-/src
 __pycache__/
