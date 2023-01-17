@@ -4,7 +4,7 @@ Congratulations! You have successfully created a new Z# project.
 
 To run the project, `cd` to the project directory and type in the following command:
 ```commandline
-py -m zs c .
+py -m zs c test_project.main.zs
 ```
 
 * At least Python version 3.10 must be installed
