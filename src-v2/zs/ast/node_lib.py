@@ -4,7 +4,6 @@ from ..text import token_info_lib as token_info
 from ..text.token import Token
 from .node import Node
 
-
 _T = TypeVar("_T")
 
 
@@ -97,18 +96,23 @@ class Class(Node[token_info.Class]):  # todo
 
     name: Optional["Identifier"]
 
+    base: Expression | None
+
     items: list[Node]
 
     def __init__(
             self,
             _class: Token,
             name: Optional["Identifier"],
-            _left_parenthesis: Token,
+            _colon: Token | None,
+            base: Expression | None,
+            _left_bracket: Token,
             items: list[Node],
-            _right_parenthesis: Token
+            _right_bracket: Token
     ):
-        super().__init__(token_info.Class(_class, _left_parenthesis, _right_parenthesis))
+        super().__init__(token_info.Class(_class, _colon, _left_bracket, _right_bracket))
         self.name = name
+        self.base = base
         self.items = items
 
 
@@ -126,17 +130,6 @@ class ExpressionStatement(Node[token_info.ExpressionStatement]):
     def __init__(self, expression: Expression, _semicolon: Token):
         super().__init__(token_info.ExpressionStatement(_semicolon))
         self.expression = expression
-
-
-class Field(Node[None]):  # todo
-    """
-    AST node for class fields (variable declaration)
-    """
-
-    def __init__(
-            self,
-    ):
-        super().__init__(None)  # todo
 
 
 class Function(Expression[token_info.Function]):
@@ -165,9 +158,10 @@ class Function(Expression[token_info.Function]):
             return_type: Expression | None,
             _left_bracket: Token | None,
             body: list[Node] | None,
-            _right_bracket: Token | None
+            _right_bracket: Token | None,
+            _semicolon: Token | None
     ):
-        super().__init__(token_info.Function(_fun, _left_parenthesis, _right_parenthesis, _colon))
+        super().__init__(token_info.Function(_fun, _left_parenthesis, _right_parenthesis, _colon, _left_bracket, _right_bracket, _semicolon))
         self.name = name
         self.parameters = parameters
         self.return_type = return_type
@@ -333,17 +327,6 @@ class Module(Node[token_info.Module]):
         self.items = items if items is not None else items
 
 
-class Parameter(Node[None]):  # todo
-    """
-    AST node for function parameter (just a typed name basically)
-    """
-
-    def __init__(
-            self,
-    ):
-        super().__init__(None)  # todo
-
-
 class Property(Node[None]):  # todo
     """
     AST node for class property
@@ -382,6 +365,58 @@ class Tuple(Expression[token_info.Tuple]):
         self.items = items
 
 
+class TypeClass(Node[token_info.TypeClass]):
+    """
+    AST node for a type class definition
+    """
+
+    name: Identifier
+
+    items: list[Node]
+
+    def __init__(
+            self,
+            _type_class: Token,
+            name: Identifier,
+            _left_bracket: Token,
+            items: list[Node],
+            _right_bracket: Token
+    ):
+        super().__init__(token_info.TypeClass(_type_class, _left_bracket, _right_bracket))
+        self.name = name
+        self.items = items
+
+
+class TypeClassImplementation(Node[token_info.TypeClassImplementation]):
+    """
+    AST node for a type class implementation
+    """
+
+    name: Identifier
+
+    implemented_type: Expression
+
+    items: list[Node]
+
+    def __init__(
+            self,
+            _type_class: Token,
+            name: Identifier,
+            _left_parenthesis: Token,
+            implemented_type: Expression,
+            _right_parenthesis: Token,
+            _left_bracket: Token,
+            items: list[Node],
+            _right_bracket: Token
+    ):
+        super().__init__(token_info.TypeClassImplementation(
+            _type_class, _left_parenthesis, _right_parenthesis, _left_bracket, _right_bracket
+        ))
+        self.name = name
+        self.implemented_type = implemented_type
+        self.items = items
+
+
 class TypedName(Node[token_info.TypedName]):
     """
     AST node for a typed name
@@ -398,12 +433,20 @@ class TypedName(Node[token_info.TypedName]):
         self.type = type
 
 
+class Unary(Expression[token_info.Unary]):
+    operand: Expression
+
+    def __init__(self, operator: Token, operand: Expression):
+        super().__init__(token_info.Unary(operator))
+        self.operand = operand
+
+
 class Var(Node[token_info.Var]):
     name: TypedName
     initializer: Expression | None
 
-    def __init__(self, _var: Token, name: TypedName, _assign: Token | None, initializer: Expression | None):
-        super().__init__(token_info.Var(_var, _assign))
+    def __init__(self, _var: Token, name: TypedName, _assign: Token | None, initializer: Expression | None, _semicolon: Token):
+        super().__init__(token_info.Var(_var, _assign, _semicolon))
         self.name = name
         self.initializer = initializer
 

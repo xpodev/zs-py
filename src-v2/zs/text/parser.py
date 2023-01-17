@@ -5,10 +5,9 @@ from .token import TokenType, Token
 from .token_stream import TokenStream
 from .. import EmptyObject
 from ..ast.node import Node
-from ..ast.node_lib import Binary, Expression
+from ..ast.node_lib import Binary, Expression, Unary
 from ..processing import StatefulProcessor, State
-
-Unary = lambda *args: args  # todo: import
+from ..text.errors import ParseError
 
 _T = TypeVar("_T")
 
@@ -81,7 +80,7 @@ class SubParser(EmptyObject):
 
     @staticmethod
     def _prefix_func(binding_power: int, token: str, expr_fn: Callable[["Parser", int], Expression]):
-        return lambda stream: Unary(token, expr_fn(stream, binding_power))
+        return lambda stream: Unary(stream.eat(token), expr_fn(stream, binding_power))
 
     @classmethod
     def infix_l(cls, binding_power: int, token: str | TokenType, expr_fn: Callable[["Parser", int], Expression]):
@@ -257,8 +256,8 @@ class Parser(StatefulProcessor):
 
     def eat(self, type_or_value: TokenType | str) -> Token | None:
         if not self.token(type_or_value):
-            self.state.error(f"Expected token: \"{type_or_value}\", got \"{self.stream.token}\" instead", self.stream.file)
-            return None
+            # self.state.error(f"Expected token: \"{type_or_value}\", got \"{self.stream.token}\" instead", self.stream.file)
+            raise ParseError()
         return self.stream.read()
 
     @overload
@@ -341,10 +340,14 @@ class Parser(StatefulProcessor):
         self._stream = stream
         result = []
         while not stream.end:
-            node = self.next(binding_power)
-            result.append(node)
-            if node is None:
+            try:
+                node = self.next(binding_power)
+                result.append(node)
+                if node is None:
+                    raise ParseError
+            except ParseError:
                 self.state.error(f"Could not parse token {self.stream.token}", self.stream.token)
+                self.stream.read()
         return result
 
     def setup(self):

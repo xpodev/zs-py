@@ -5,19 +5,25 @@ from pathlib import Path
 from typing import Callable
 
 from zs.cli.options import Options, get_options
-from zs.ctrt.lib import ExObj
-from zs.ctrt.objects import NativeFunction
+from zs.ctrt.core import _Object
+from zs.ctrt.native import NativeObject
+from zs.ctrt.objects import NativeFunction, Core, Scope
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter
-from zs.std.objects.compilation_environment import Document, ContextManager
+from zs.std.objects.compilation_environment import ContextManager
 from zs.std.parsers import base as base_language
 from zs.std.processing.import_system import ImportResult
 from zs.std.processing.toolchain import Toolchain
 
 
-class Builtins(ImportResult, ExObj):
+class Builtins(ImportResult, NativeObject):
     def __init__(self):
         super().__init__()
+        NativeObject.__init__(self)
+
+    @property
+    def owner(self):
+        return Core
 
     def all(self):
         return vars(self)
@@ -50,7 +56,7 @@ class Compiler(StatefulProcessor):
     def toolchain(self):
         return self._toolchain
 
-    def compile(self, path: str | Path) -> Document:
+    def compile(self, path: str | Path) -> Scope:
         super().run()
 
         path = Path(path)
@@ -74,7 +80,6 @@ def main(options: Options):
 
     compiler = Compiler(state=state, context=context, toolchain_factory=lambda c: Toolchain(state=c.state, parser=parser, context=context))
     import_system = compiler.toolchain.interpreter.import_system
-    context.global_context.add(compiler, "__srf__")
 
     import_system.add_directory(Path(options.source).parent.resolve())
 
@@ -86,8 +91,9 @@ def main(options: Options):
         item = getattr(__builtins__, name)
         if callable(item):
             setattr(builtins, name, NativeFunction(item))
+    builtins.create_instance_of = NativeFunction(lambda typ: _Object(typ))
 
-    compiler.toolchain.interpreter.x.global_scope.add_local("Python", builtins)
+    compiler.toolchain.interpreter.x.global_scope.refer("Python", builtins)
 
     # def _assign(left, right):
     #     if isinstance(left, Field):
@@ -128,14 +134,14 @@ def main(options: Options):
     except Exception as e:
         raise e
     else:
-
-        for module in compiler.context.modules:
-            if module.entry_point:
-                print("Module:", module.name, " | Entry:", module.entry_point)
-            else:
-                print("Module:", module.name)
-            for name, member in module.members.items:
-                print('\t', name, " :: ", member)
+        ...
+        # for module in compiler.context.modules:
+        #     if module.entry_point:
+        #         print("Module:", module.name, " | Entry:", module.entry_point)
+        #     else:
+        #         print("Module:", module.name)
+        #     for name, member in module.members.items:
+        #         print('\t', name, " :: ", member)
     finally:
         state.reset()
 

@@ -1,7 +1,5 @@
 from enum import Enum
-from typing import Optional
-
-from . import EmptyObject, Object
+from typing import Optional, Any
 
 
 class MessageType(str, Enum):
@@ -10,14 +8,13 @@ class MessageType(str, Enum):
     Error = "Error"
 
 
-class Message(EmptyObject):
+class Message:
     _type: MessageType
-    _origin: Object | None
+    _origin: Any | None
     _content: str
     _processor: "StatefulProcessor"
 
-    def __init__(self, message_type: MessageType, message: str, origin: Object = None, proc: "StatefulProcessor" = None):
-        super().__init__()
+    def __init__(self, message_type: MessageType, message: str, origin: Any = None, proc: "StatefulProcessor" = None):
         self._type = message_type
         self._origin = origin
         self._content = message
@@ -40,13 +37,12 @@ class Message(EmptyObject):
         return self._processor
 
 
-class State(EmptyObject):
+class State:
     _messages: list[Message]
     _processor: Optional["StatefulProcessor"]
     _cache: list[Message] | None
 
     def __init__(self):
-        super().__init__()
         self._messages = []
         self._processor = None
         self._cache = None
@@ -63,13 +59,13 @@ class State(EmptyObject):
     def processor(self):
         return self._processor
 
-    def error(self, message: str, origin: Object = None):
+    def error(self, message: str, origin: Any = None):
         self.message(MessageType.Error, message, origin)
 
-    def info(self, message: str, origin: Object = None):
+    def info(self, message: str, origin: Any = None):
         self.message(MessageType.Info, message, origin)
 
-    def message(self, message_type: MessageType, message: str, origin: Object = None):
+    def message(self, message_type: MessageType, message: str, origin: Any = None):
         self._messages.append(Message(message_type, message, origin, self._processor))
 
     def reset(self):
@@ -81,15 +77,14 @@ class State(EmptyObject):
     def run(self, processor: "StatefulProcessor"):
         self._processor = processor
 
-    def warning(self, message: str, origin: Object = None):
+    def warning(self, message: str, origin: Any = None):
         self.message(MessageType.Warning, message, origin)
 
 
-class StatefulProcessor(EmptyObject):
+class StatefulProcessor:
     _state: State
 
     def __init__(self, state: State):
-        super().__init__()
         self._state = state
 
     @property

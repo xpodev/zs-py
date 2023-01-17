@@ -1,8 +1,10 @@
 from pathlib import Path
 
+import zs.ctrt
+from zs.ctrt.objects import Scope
 from zs.ctrt.runtime import Interpreter
 from zs.processing import StatefulProcessor, State
-from zs.std.objects.compilation_environment import Document, ContextManager
+from zs.std.objects.compilation_environment import ContextManager
 from zs.text.file_info import SourceFile, DocumentInfo
 from zs.text.parser import Parser
 from zs.text.token_stream import TokenStream
@@ -29,7 +31,7 @@ class Toolchain(StatefulProcessor):
         self._context = context or ContextManager()
         self._tokenizer = tokenizer or Tokenizer(state=self.state)
         self._parser = parser or Parser(state=self.state)
-        self._interpreter = interpreter or Interpreter(self.state)
+        zs.ctrt._InterpreterInstance = self._interpreter = interpreter or Interpreter(self.state)
 
     @property
     def tokenizer(self):
@@ -47,17 +49,14 @@ class Toolchain(StatefulProcessor):
     def document(self):
         return self._document
 
-    @property
-    def gcs(self):
-        return self._global
-
-    def compile_document(self, path: Path) -> Document:
+    def compile_document(self, path: Path) -> Scope:
         super().run()
 
         path = path.resolve()
         self._document = info = DocumentInfo(path)
 
-        if (nodes := self._context.get_nodes_from_cached(str(path))) is None:
+        if (scope := self._context.get_scope_from_cached(info.path_string)) is None:
+
             file = SourceFile.from_path(path)
 
             token_generator = self._tokenizer.tokenize(file)
@@ -66,29 +65,26 @@ class Toolchain(StatefulProcessor):
 
             nodes = self._parser.parse(token_stream)
 
-        document = Document(info, nodes)
+            with self.interpreter.new_context():
 
-        with self.interpreter.new_context():
-            self.interpreter.x.push_frame()
-            frame = self.interpreter.x.frame
+                # document frame
+                with self.interpreter.x.scope() as scope:
 
-            self.interpreter.run()
+                    self.interpreter.run()
 
-            try:
-                for node in nodes:
-                    self._interpreter.execute(node)
-            except Exception as e:
-                print(50 * '-')
-                print(f"Caught exception '{type(e).__name__}' while processing node with token '{node}'.")
-                print(f"The node is a '{type(node).__name__}' node.")
-                print(f"File: {info.path}")
-                print()
-                print("Exception:", str(e))
-                print(50 * '-')
-                raise e
+                    try:
+                        for node in nodes:
+                            self._interpreter.execute(node)
+                    except Exception as e:
+                        print(50 * '-')
+                        print(f"Caught exception '{type(e).__name__}' while processing node with token '{node}'.")
+                        print(f"The node is a '{type(node).__name__}' node.")
+                        print(f"File: {info.path}")
+                        print()
+                        print("Exception:", str(e))
+                        print(50 * '-')
+                        raise e
 
-        for name, item in frame.items:
-            document.add(item, name)
+                self._context.add_scope_to_cache(info.path_string, scope)
 
-        return document
-        # return self.interpreter.x.frame
+        return scope

@@ -79,13 +79,15 @@ class Class(TokenInfo):
     """
     Token info for the 'class' node:
 
-    'class' NAME? '{' BODY '}'
+    'class' NAME? ( ':' EXPRESSION )? '{' BODY '}'
     """
 
     keyword_class: Token
 
-    left_parenthesis: Token
-    right_parenthesis: Token
+    colon: Token
+
+    left_bracket: Token
+    right_bracket: Token
 
 
 @dataclass(**_cfg)
@@ -124,6 +126,11 @@ class Function(TokenInfo):
     right_parenthesis: Token
 
     colon: Token
+
+    left_bracket: Token | None
+    right_bracket: Token | None
+
+    semicolon: Token | None
 
 
 @dataclass(**_cfg)
@@ -250,6 +257,37 @@ class Tuple(TokenInfo):
 
 
 @dataclass(**_cfg)
+class TypeClass(TokenInfo):
+    """
+    Token info for a type class definition
+
+    'typeclass' NAME '{' NODE* '}'
+    """
+
+    keyword_type_class: Token
+
+    left_bracket: Token
+    right_bracket: Token
+
+
+@dataclass(**_cfg)
+class TypeClassImplementation(TokenInfo):
+    """
+    Token info for a type class implementation
+
+    'typeclass' NAME '(' EXPRESSION ')' '{' NODE* '}'
+    """
+
+    keyword_type_class: Token
+
+    left_parenthesis: Token
+    right_parenthesis: Token
+
+    left_bracket: Token
+    right_bracket: Token
+
+
+@dataclass(**_cfg)
 class TypedName(TokenInfo):
     """
     Token info for a typed name
@@ -261,15 +299,29 @@ class TypedName(TokenInfo):
 
 
 @dataclass(**_cfg)
+class Unary(TokenInfo):
+    """
+    Token info for a unary expression:
+
+    OPERATOR EXPRESSION
+    """
+
+    operator: Token
+
+
+@dataclass(**_cfg)
 class Var(TokenInfo):
     """
     Token info for a 'var' declaration
 
-    var TYPED_NAME ('=' EXPRESSION)?
+    var TYPED_NAME ('=' EXPRESSION)? ';'
     """
 
     var: Token
+
     assign: Token | None
+
+    semicolon: Token
 
 
 @dataclass(**_cfg)

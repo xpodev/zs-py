@@ -2,18 +2,18 @@ from pathlib import Path
 from typing import Iterable
 
 from zs import Object
-from zs.std.objects.compilation_environment import Document
+from zs.ctrt.objects import Scope
 from zs.std.processing.import_system import Importer, ImportResult, ImportSystem
 
 
 class ZSImportResult(ImportResult):
-    _document: Document
+    _scope: Scope
     _items: dict[str, Object]
 
-    def __init__(self, document: Document):
+    def __init__(self, scope: Scope):
         super().__init__()
-        self._document = document
-        self._items = dict(document.items)
+        self._scope = scope
+        self._items = dict(scope.members)
 
     def all(self) -> Iterable[tuple[str, Object]]:
         for name, item in self._items.items():
@@ -41,6 +41,6 @@ class ZSImporter(Importer):
         if path is None:
             return None
 
-        document: Document = self._compiler.compile(path)
+        document: Scope = self._compiler.compile(path)
 
         return ZSImportResult(document)

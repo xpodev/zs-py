@@ -17,6 +17,29 @@ class NoParentScopeError(ZSError):
     ...
 
 
+class NameAlreadyBoundError(ZSError):
+    ...
+
+
+class UnknownFieldError(ZSError):
+    ...
+
+
+class FieldAlreadyDefinedError(ZSError):
+    ...
+
+
+class MemberAlreadyDefinedError(ZSError):
+    ...
+
+
+class UnknownMemberError(ZSError):
+    ...
+
+
+########### FLOW CONTROL #############
+
+
 class ReturnInstructionInvoked(Exception):
     _value: Any
 

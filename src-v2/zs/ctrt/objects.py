@@ -1,13 +1,19 @@
 from typing import Optional, Any, Callable
 
 from zs.ast.node import Node
-from zs.ctrt.errors import NameNotFoundError, NameAlreadyExistsError, NoParentScopeError
+from zs.ctrt import get_runtime
+from zs.ctrt.core import _Object, _ObjectType, _TypeClass
+from zs.ctrt.errors import NameNotFoundError, NameAlreadyExistsError, NoParentScopeError, NameAlreadyBoundError, UnknownMemberError
+from zs.ctrt.native import NativeObject
+from zs.ctrt.protocols import TypeProtocol, ObjectProtocol, ClassProtocol, MutableClassProtocol, ImmutableClassProtocol, SetterProtocol, GetterProtocol, ScopeProtocol, BindProtocol, \
+    ParameterizedProtocol
+from zs.utils import SingletonMeta
 
 
 class Parameter:
     _owner: "Function"
     name: str
-    type: Any
+    type: TypeProtocol
 
     def __init__(self, name: str, typ: Any, owner: "Function"):
         self.name = name
@@ -23,18 +29,56 @@ class Parameter:
         return self._owner.parameters.index(self)
 
 
-class FunctionType:
-    def is_subclass(self, of):
-        return of is self
+class Argument(NativeObject, GetterProtocol, SetterProtocol):
+    parameter: Parameter
+    value: ObjectProtocol
+
+    def __init__(self, parameter: Parameter, value: ObjectProtocol):
+        super().__init__()
+        self.parameter = parameter
+        self.value = value
+
+    def get_type(self) -> TypeProtocol:
+        return self.parameter.type
+
+    def get(self):
+        return self.value
+
+    def set(self, value: ObjectProtocol):
+        if not self.get_type().is_instance(value):
+            raise TypeError()
+        self.value = value
 
 
-class NativeFunction:
+class Variable(NativeObject, GetterProtocol, SetterProtocol):
+    name: str
+    type: TypeProtocol
+    value: ObjectProtocol
+
+    def __init__(self, name: str, type: TypeProtocol, value: ObjectProtocol = None):
+        super().__init__()
+        self.name = name
+        self.type = type
+        self.set(value or type.default())
+
+    def get_type(self) -> "_ObjectType":
+        return self.type
+
+    def get(self):
+        return self.value
+
+    def set(self, value: ObjectProtocol):
+        if not self.type.is_instance(value):
+            raise TypeError(f"Can't assign value of type '{value.get_type()}' to variable of type '{self.type}'")
+        self.value = value
+
+
+class NativeFunction(NativeObject):
     _native: Callable[..., Any]
     _runtime: bool
 
-    type = FunctionType
-
     def __init__(self, native: Callable[..., Any], include_runtime: bool = False):
+        super().__init__()
         self._native = native
         self._runtime = include_runtime
 
@@ -46,7 +90,7 @@ class NativeFunction:
         return self._native(*args, **kwargs)
 
 
-class Function:
+class Function(NativeObject, BindProtocol, ParameterizedProtocol):
     """
     Represents a Z# function that's used by the ct-runtime interpreter.
     """
@@ -57,14 +101,21 @@ class Function:
         def __init__(self):
             self.nodes = []
 
+    class _BoundFunction:
+        function: "Function"
+        instance: ObjectProtocol
+
+        def __init__(self, function: "Function", instance: ObjectProtocol):
+            self.function = function
+            self.instance = instance
+
     name: str | None
     _lexical_scope: "Scope"
     _parameters: list[Parameter]
     _body: Body
 
-    type = FunctionType
-
     def __init__(self, lexical_scope: "Scope"):
+        super().__init__()
         self._lexical_scope = lexical_scope
         self._parameters = []
         self._body = self.Body()
@@ -74,6 +125,10 @@ class Function:
         return self._lexical_scope
 
     @property
+    def owner(self):
+        return self.lexical_scope
+
+    @property
     def parameters(self):
         return self._parameters.copy()
 
@@ -81,19 +136,81 @@ class Function:
     def body(self):
         return self._body
 
-    def add_parameter(self, name=None, typ=None):
+    def get_parameter_types(self) -> list[TypeProtocol]:
+        return list(map(lambda p: p.type, self._parameters))
+
+    def bind(self, instance: ObjectProtocol):
+        return self._BoundFunction(self, instance)
+
+    def add_parameter(self, name=None, typ=None, index: int = None):
         parameter = Parameter(name, typ, self)
-        self._parameters.append(parameter)
+        if index is None:
+            self._parameters.append(parameter)
+        else:
+            self._parameters.insert(index, parameter)
         return parameter
 
 
-class Scope:
-    _parent: Optional["Scope"]
-    _items: dict[str, Any]
+class Method(Function):
+    owner: "Class"
+    _static: bool
 
-    def __init__(self, parent: Optional["Scope"] = None):
+    def __init__(self, owner: "Class", lexical_scope: "Scope", is_static: bool = False):
+        super().__init__(lexical_scope)
+        self.owner = owner
+        self._static = is_static
+
+    @property
+    def is_static(self):
+        return self._static
+
+    @is_static.setter
+    def is_static(self, value):
+        self._static = value
+
+
+class FunctionGroup(NativeObject):
+    name: str
+    _overloads: list[Function]
+
+    def __init__(self, name: str, *fns: Function):
+        super().__init__()
+        self.name = name
+        self._overloads = list(fns)
+
+    @property
+    def overloads(self):
+        return self._overloads.copy()
+
+    def add_overload(self, fn: Function):
+        self._overloads.append(fn)
+
+    def get_matching_overloads(self, args: list[ObjectProtocol]):
+        result = []
+        for overload in self._overloads:
+            if len(overload.parameters) < len(args):
+                continue
+            for parameter, arg in zip(overload.parameters, args):
+                if parameter.type is not None and not parameter.type.is_instance(arg):
+                    break
+            else:
+                result.append(overload)
+        return result
+
+
+class Scope(ScopeProtocol):
+    _parent: Optional["Scope"]
+    _items: dict[str, ObjectProtocol]
+    _members: dict[str, ObjectProtocol]
+    _types: dict[str, "Class"]
+
+    def __init__(self, parent: Optional["Scope"] = None, **items: ObjectProtocol):
         self._parent = parent
-        self._items = {}
+        self._items = items
+        self._types = {
+            name: item.get_type() for name, item in items.items()
+        }
+        self._members = {}
 
     @property
     def is_toplevel_scope(self):
@@ -107,15 +224,25 @@ class Scope:
     def items(self):
         return self._items.items()
 
-    def add_local(self, name: str, value: Any = None):
-        """
-        Adds a new storage unit to this scope.
+    @property
+    def members(self):
+        return self._members.items()
 
-        :raises: `NameAlreadyExistsError` if the name is already present in the context.
-        """
+    @property
+    def owner(self):
+        return self.parent
+
+    def add_local(self, name: str, value: ObjectProtocol = None, type_: "Class" = None):
+        if value is None and type_ is None:
+            raise ValueError(f"You must supply at least either the type or a value")
+        if value is None:
+            value = type_.default
+        if type_ is None:
+            type_ = value.get_type()
         if name in self._items:
             raise NameAlreadyExistsError(name, self)
         self._items[name] = value
+        self._types[name] = type_
 
     def get_local(self, name: str) -> Any:
         """
@@ -148,7 +275,7 @@ class Scope:
         """
         if self.parent is None:
             raise NoParentScopeError(self)
-        return self.parent.get_name(name)
+        return self.parent.get_name(None, name)
 
     def set_nonlocal(self, name: str, value: Any):
         """
@@ -160,7 +287,7 @@ class Scope:
             raise NoParentScopeError(self)
         self.parent.set_name(name, value)
 
-    def get_name(self, name: str):
+    def get_name(self, _, name: str):
         """
         Get a value bound to the given name in this or a parent scope.
 
@@ -170,7 +297,7 @@ class Scope:
             return self.get_local(name)
         if self.parent is None:
             raise NameNotFoundError(name, self)
-        return self.parent.get_name(name)
+        return self.parent.get_name(_, name)
 
     def set_name(self, name: str, value: Any):
         """
@@ -184,27 +311,19 @@ class Scope:
             raise NameNotFoundError(name, self)
         self.parent.set_name(name, value)
 
+    def define(self, name: str, value: ObjectProtocol = None, type_: "Class" = None):
+        # if value is not None and value.owner is not None and value.owner is not self:
+        #     raise NameAlreadyBoundError(f"'{name}' is already bound to scope {value.owner} and it can't be bound to {self}")
+        # if value is not None and hasattr(value, "_owner"):
+        #     value._owner = self
+        self._members[name] = value
+        self.add_local(name, value, type_)
 
-class Instance:
-    _type: "Class"
-    _data: list[Any]
-
-    def __init__(self, typ):
-        self._type = typ
-        self._data = [None for _ in range(len(typ.fields))]
-
-    @property
-    def type(self):
-        return self._type
-
-    def get_data(self, index):
-        return self._data[index]
-
-    def set_data(self, index, value):
-        self._data[index] = value
+    def refer(self, name: str, value: ObjectProtocol = None, type_: "Class" = None):
+        self.add_local(name, value, type_)
 
 
-class Class(Scope):
+class Class(_ObjectType, MutableClassProtocol, ScopeProtocol):
     """
     Represents a Z# class that's used by the ct-runtime interpreter.
 
@@ -212,59 +331,94 @@ class Class(Scope):
     Objects hold data.
     """
 
-    class Field:
-        name: str
-        _index: int
-        _type: "Class"
-        _owner: "Class"
-
-        def __init__(self, name, owner: "Class", typ: "Class", index=None):
-            self.name = name
-            self._index = len(owner.fields) if index is None else index
-            self._type = typ
-            self._owner = owner
-
-        def get(self, instance: Instance):
-            if not instance.type.is_subclass(self._owner):
-                raise TypeError
-            return instance.get_data(self._index)
-
-        def set(self, instance: Instance, value: Instance):
-            if not instance.type.is_subclass(self._owner):
-                raise TypeError
-            if not value.type.is_subclass(self._type):
-                raise TypeError
-            instance.set_data(self._index, value)
-
     name: str | None
     base: Optional["Class"]
+    default: Any | None
     _lexical_scope: Scope
-    _fields: list[Field]
+    _methods: dict[str, FunctionGroup]
+    _constructor: FunctionGroup
 
-    def __init__(self, name, base, lexical_scope):
-        super().__init__(lexical_scope)
+    def __init__(self, name, base: ClassProtocol | None, lexical_scope: Scope | None):
+        super().__init__()
         self.name = name
-        self.base = base
+        self.base = base or _ObjectType.Instance
         self._lexical_scope = lexical_scope
-        self._fields = base.fields if base is not None else []
+        self._constructor = FunctionGroup(name)
 
     @property
-    def fields(self):
-        return self._fields.copy()
+    def constructor(self):
+        return self._constructor
 
-    def add_field(self, name, typ):
-        field = self.Field(name, self, typ, len(self._fields))
+    def add_method(self, name: str, method: Function):
+        method.add_parameter(name, self, 0)
+        if name not in self._methods:
+            group = FunctionGroup(name, method)
+            super().add_method(name, group)
+        else:
+            self._methods[name].add_overload(method)
 
-    def is_subclass(self, of):
+    def add_constructor(self, constructor: Function):
+        self._constructor.add_overload(constructor)
+
+    def define(self, name: str, value: Function | Variable = None):
+        if isinstance(value, Class):
+            raise NotImplementedError
+        if isinstance(value, Function):
+            if name == self.name:
+                self.add_constructor(value)
+            else:
+                self.add_method(name, value)
+        if isinstance(value, Variable):
+            self.add_field(name, value.type, value.value)
+
+    def get_base(self) -> ClassProtocol | None:
+        return self.base
+
+    def get_name(self, instance: ObjectProtocol | None, name: str):
+        try:
+            return super().get_name(instance, name)
+        except UnknownMemberError as e:
+            try:
+                return self._lexical_scope.get_name(instance, name)
+            except NameNotFoundError:
+                raise e
+
+    def is_subclass(self, base):
         cls = self
         while cls.base is not None:
-            if cls.base == of:
+            if cls.base == base:
                 return True
             cls = cls.base
-        return cls == of
+        return cls == base
 
-    def __create_instance(self, runtime, constructor):
-        instance = Instance(self)
+    def create_instance(self, args: list[ObjectProtocol]):
+        instance = _Object(self)
+
+        runtime = get_runtime()
+        overloads = self.constructor.get_matching_overloads(args)
+
+        if len(overloads) != 1:
+            raise TypeError(f"Too many overloads match the given arguments")
+
+        constructor = overloads[0]
+
+        runtime.do_function_call(constructor, [instance, *args])
+
+        return instance
+
+    def __str__(self):
+        return f"<Z# Class '{self.name if self.name else '{Anonymous}'}' at {hex(id(self))}>"
+
+
+class TypeClass(_TypeClass, ScopeProtocol):
+    name: str
+
+    def __init__(self, name: str):
+        super().__init__()
+        self.name = name
+
+
+Core = Scope()
 
 
 class Frame(Scope):

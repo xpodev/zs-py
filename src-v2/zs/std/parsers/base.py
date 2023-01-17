@@ -3,9 +3,10 @@ from typing import Callable, TypeVar, Any
 
 from zs.ast.node import Node
 from zs.ast.node_lib import Function, Class, If, Expression, Binary, ExpressionStatement, Identifier, Literal, Module, Import, Alias, TypedName, FunctionCall, MemberAccess, Block, Return, While, \
-    Continue, Break, When
+    Continue, Break, When, Var, TypeClass, TypeClassImplementation
 from zs.processing import State
 from zs.std.parsers.misc import subparser, copy_with
+from zs.text.errors import ParseError
 from zs.text.parser import ContextualParser, Parser, SubParser
 
 # expression nodes
@@ -16,10 +17,6 @@ from zs.text.token import TokenType, Token
 _SENTINEL = object()
 _T = TypeVar("_T")
 _U = TypeVar("_U")
-
-
-class ParseError(Exception):
-    ...
 
 
 def _with_default(fn: Callable[[Parser, ...], _T]):
@@ -83,7 +80,7 @@ def separated(fn: Callable[[Parser], _T], sep: Callable[[Parser], Any]) -> Calla
     return wrapper
 
 
-def _one_of(*fns: Callable[[Parser], Node]) -> Node | _T:
+def _one_of(*fns: Callable[[Parser], Node]):
     @_with_default
     def wrapper(parser: Parser) -> Node:
         for fn in fns:
@@ -245,7 +242,9 @@ def parse_function(parser: Parser) -> Function:
 
     if parser.token(';'):
         _left_bracket = _right_bracket = body = None
+        _semicolon = parser.eat(';')
     else:
+        _semicolon = None
         _left_bracket = parser.eat('{')
 
         # body = _many(_next("Function.Body"))(parser)
@@ -265,7 +264,8 @@ def parse_function(parser: Parser) -> Function:
         return_type,
         _left_bracket,
         body,
-        _right_bracket
+        _right_bracket,
+        _semicolon
     )
 
 
@@ -284,20 +284,22 @@ def parse_class(parser: Parser) -> Class:
 
     if parser.token(':'):
         _colon = parser.eat(':')
-        bases = separated(parser, _next("Expression"), _eat(','))
+        # bases = separated(parser, _next("Expression"), _eat(','))
+        base = parser.next("Expression")
     else:
-        _colon = None
-        bases = []
+        _colon = base = None
+        # bases = []
 
     _left_bracket = parser.eat('{')
 
-    items = _many(_one_of(
-        parse_function,
-        parse_class,
-        # parse_variable,
-        # parse_immutable,
-        # parse_constant,
-    ))(parser)
+    items = []
+
+    while not parser.token('}'):
+        items.append(_one_of(
+            parse_var,
+            parse_function,
+            parse_class,
+        )(parser))
 
     _right_bracket = parser.eat('}')
 
@@ -307,8 +309,8 @@ def parse_class(parser: Parser) -> Class:
         # _left_parenthesis,
         # metaclass,
         # _right_parenthesis,
-        # _colon,
-        # bases,
+        _colon,
+        base,
         _left_bracket,
         items,
         _right_bracket,
@@ -341,6 +343,64 @@ def parse_module(parser: Parser) -> Module:
         _right_bracket,
         _semicolon
     )
+
+
+@subparser("typeclass")
+def parse_type_class(parser: Parser) -> TypeClass | TypeClassImplementation:
+    keyword = parser.eat("typeclass")
+
+    name = _identifier(parser)
+
+    if parser.token('('):
+        _left_parenthesis = parser.eat('(')
+        implemented_type = parser.next("Expression")
+        _right_parenthesis = parser.eat(')')
+    else:
+        _left_parenthesis = implemented_type = _right_parenthesis = None
+
+    _left_bracket = parser.eat('{')
+
+    items = []
+    while not parser.token('}'):
+        items.append(_one_of(
+            parse_class,
+            parse_function,
+            parse_var,
+            parse_type_class
+        )(parser))
+
+    _right_bracket = parser.eat('}')
+
+    if implemented_type is not None:
+        return TypeClassImplementation(
+            keyword,
+            name,
+            _left_parenthesis,
+            implemented_type,
+            _right_parenthesis,
+            _left_bracket,
+            items,
+            _right_bracket
+        )
+    else:
+        return TypeClass(keyword, name, _left_bracket, items, _right_bracket)
+
+
+@subparser("var")
+def parse_var(parser: Parser) -> Var:
+    keyword = parser.eat("var")
+
+    typed_name = parse_typed_name(parser)
+
+    if parser.token('='):
+        _assign = parser.eat('=')
+        initializer = parser.next("Expression")
+    else:
+        _assign = initializer = None
+
+    _semicolon = parser.eat(';')
+
+    return Var(keyword, typed_name, _assign, initializer, _semicolon)
 
 
 # operators
@@ -550,10 +610,15 @@ class ExpressionParser(ContextualParser[Expression]):
             120, '.', led=parse_member_access
         ))
 
+        self.add_parser(copy_with(parse_function, binding_power=0))
+        self.add_parser(copy_with(parse_class, binding_power=0))
+        self.add_parser(copy_with(parse_type_class, binding_power=0))
+
         # terminal symbols
 
         self.symbol(')')
         self.symbol(';')
+        self.symbol('{')
 
     def parse(self, parser: "Parser", binding_power: int) -> _T:
         expression = super().parse(parser, binding_power)
@@ -656,6 +721,8 @@ def get_parser(state: State):
         parse_function,
         parse_class,
         parse_module,
+        parse_type_class,
+        parse_var,
 
         parse_continue,
         parse_break,
