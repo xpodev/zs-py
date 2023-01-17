@@ -1,6 +1,3 @@
-from .. import EmptyObject
-
-
 from argparse import ArgumentParser
 
 
@@ -9,7 +6,7 @@ _arg_parser = ArgumentParser(
 )
 
 
-class Options(EmptyObject):
+class Options:
     _validate: bool
     _engine: str
     _output: str | None

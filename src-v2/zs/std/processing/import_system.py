@@ -1,25 +1,21 @@
 from pathlib import Path
 from typing import Iterable
 
-from zs import EmptyObject, Object
-from zs.ast.node_lib import Import
+from zs.ctrt.protocols import ObjectProtocol
 
 
-class ImportResult(Object[Import]):
-    def __init__(self):
-        super().__init__(None)
-
-    def all(self) -> Iterable[tuple[str, Object]]:
+class ImportResult:
+    def all(self) -> Iterable[tuple[str, ObjectProtocol]]:
         ...
 
-    def item(self, name: str) -> Object:
+    def item(self, name: str) -> ObjectProtocol:
         ...
 
-    def items(self, names: list[str]) -> Iterable[Object]:
+    def items(self, names: list[str]) -> Iterable[ObjectProtocol]:
         ...
 
 
-class Importer(EmptyObject):
+class Importer:
     def import_file(self, path: Path) -> ImportResult | None:
         ...
 

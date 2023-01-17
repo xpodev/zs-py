@@ -1,7 +1,6 @@
 from enum import Enum
 
 from .file_info import Span
-from .. import EmptyObject
 
 
 __all__ = [
@@ -94,7 +93,7 @@ class TokenType(str, Enum):
     While = f"{TokenCategory.KW}.While"
 
 
-class Token(EmptyObject):
+class Token:
     _type: TokenType
     _span: Span
     _value: str

@@ -3,7 +3,6 @@ from typing import Callable, overload, TypeVar, Generic, Type
 
 from .token import TokenType, Token
 from .token_stream import TokenStream
-from .. import EmptyObject
 from ..ast.node import Node
 from ..ast.node_lib import Binary, Expression, Unary
 from ..processing import StatefulProcessor, State
@@ -18,7 +17,7 @@ __all__ = [
 ]
 
 
-class SubParser(EmptyObject):
+class SubParser:
     _binding_power: int
     _token: str | TokenType
     _nud: Callable[["Parser"], Node | None] | None

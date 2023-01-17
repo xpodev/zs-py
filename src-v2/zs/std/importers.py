@@ -1,29 +1,29 @@
 from pathlib import Path
 from typing import Iterable
 
-from zs import Object
 from zs.ctrt.objects import Scope
+from zs.ctrt.protocols import ObjectProtocol
 from zs.std.processing.import_system import Importer, ImportResult, ImportSystem
 
 
 class ZSImportResult(ImportResult):
     _scope: Scope
-    _items: dict[str, Object]
+    _items: dict[str, ObjectProtocol]
 
     def __init__(self, scope: Scope):
         super().__init__()
         self._scope = scope
         self._items = dict(scope.members)
 
-    def all(self) -> Iterable[tuple[str, Object]]:
+    def all(self) -> Iterable[tuple[str, ObjectProtocol]]:
         for name, item in self._items.items():
             yield name, item
 
-    def items(self, names: list[str]) -> Iterable[Object]:
+    def items(self, names: list[str]) -> Iterable[ObjectProtocol]:
         for name in names:
             yield self._items[name]
 
-    def item(self, name: str) -> Object:
+    def item(self, name: str) -> ObjectProtocol:
         return self._items[name]
 
 

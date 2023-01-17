@@ -1,7 +1,6 @@
 import io
 
 from .file_info import Position
-from .. import EmptyObject
 
 
 __all__ = [
@@ -9,7 +8,7 @@ __all__ = [
 ]
 
 
-class TextStream(EmptyObject):
+class TextStream:
     class TextStreamSavePosition:
         def __init__(self, stream: "TextStream"):
             self.stream = stream

@@ -2,8 +2,6 @@ import io
 from pathlib import Path
 from typing import Literal
 
-from .. import EmptyObject
-
 
 __all__ = [
     "SourceFile",
@@ -13,7 +11,7 @@ __all__ = [
 ]
 
 
-class DocumentInfo(EmptyObject):
+class DocumentInfo:
     _path: Path
 
     def __init__(self, path: str | Path):
@@ -34,7 +32,7 @@ class DocumentInfo(EmptyObject):
         return f"Document @ {self.path}"
 
 
-class SourceFile(EmptyObject):
+class SourceFile:
     _info: DocumentInfo
     _content_stream: io.TextIOBase | io.RawIOBase
 
@@ -64,7 +62,7 @@ class SourceFile(EmptyObject):
         return f"SourceFile @ {self._info.path}"
 
 
-class Position(EmptyObject):
+class Position:
     _line: int
     _column: int
 
@@ -110,7 +108,7 @@ class Position(EmptyObject):
         return f'{self.__class__.__name__}({self._line}, {self._column})'
 
 
-class Span(EmptyObject):
+class Span:
     _start: Position
     _end: Position
     _text: str

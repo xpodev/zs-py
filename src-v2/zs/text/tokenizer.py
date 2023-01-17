@@ -1,6 +1,5 @@
 from typing import Iterable
 
-from .. import EmptyObject
 from .file_info import SourceFile, Span, Position
 from .text_stream import TextStream
 from .token import Token, TokenType

@@ -1,12 +1,9 @@
-from .. import EmptyObject
-
-
 __all__ = [
     "TokenInfo",
 ]
 
 
-class TokenInfo(EmptyObject):
+class TokenInfo:
     def __str__(self):
         try:
             return str(getattr(self, self.__slots__[0]))

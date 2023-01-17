@@ -3,7 +3,6 @@ from enum import Enum
 from typing import Iterable
 
 from .token import Token, TokenType
-from .. import EmptyObject
 
 
 __all__ = [
@@ -18,7 +17,7 @@ class SeekMode(int, Enum):
     End = 2
 
 
-class TokenStream(EmptyObject):
+class TokenStream:
     _tokens: list[Token]
     _current: int
     _file: str
