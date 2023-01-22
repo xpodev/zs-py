@@ -4,7 +4,7 @@ from pathlib import Path
 
 from zs.ast.node import Node
 from zs.ast import node_lib as nodes
-from zs.ctrt.core import _NullType, _UnitType
+from zs.ctrt.core import _NullType, _UnitType, _AnyType
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
 from zs.ctrt.objects import Frame, Function, Scope, NativeFunction, Class, FunctionGroup, Variable, TypeClass, Argument, TypeClassImplementation
 from zs.processing import StatefulProcessor, State
@@ -262,7 +262,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             self.x.current_scope.define(func.name, func)
 
         for parameter in function.parameters:
-            parameter_type = self.execute(parameter.type) if parameter.type else None
+            parameter_type = self.execute(parameter.type) if parameter.type else _AnyType()
             param = func.add_parameter(parameter.name.name, parameter_type)
 
         if function.body:
@@ -433,7 +433,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         elif initializer is None:
             initializer = var_type.default()
 
-        if var_type is not None and not var_type.is_instance(initializer):
+        if var_type is not None and not initializer.get_type().assignable_to(var_type):
             return self.state.error(f"Initializer expression does not match the variable type", var)
 
         name = var.name.name.name

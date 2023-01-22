@@ -22,7 +22,7 @@ class _TypeType(TypeProtocol, metaclass=SingletonMeta):
         return cls()
 
 
-class _VoidType(TypeProtocol):
+class _VoidType(TypeProtocol, metaclass=SingletonMeta):
     """
     The `void` type. This type doesn't have any instances.
     """
@@ -82,7 +82,7 @@ class _AnyType(TypeProtocol, metaclass=SingletonMeta):
         raise TypeError(f"`any` doesn't have a default value because it is an abstract type.")
 
 
-class _FunctionType(TypeProtocol, DefaultCallableProtocol):
+class _FunctionType(CallableTypeProtocol, DefaultCallableProtocol):
     def __init__(self, parameters: list[TypeProtocol], returns: TypeProtocol):
         self.parameters = parameters
         self.returns = returns
