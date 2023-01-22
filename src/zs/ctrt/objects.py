@@ -2,12 +2,11 @@ from typing import Optional, Any, Callable
 
 from zs.ast.node import Node
 from zs.ctrt import get_runtime
-from zs.ctrt.core import _Object, _ObjectType, _TypeClass
-from zs.ctrt.errors import NameNotFoundError, NameAlreadyExistsError, NoParentScopeError, NameAlreadyBoundError, UnknownMemberError
+from zs.ctrt.core import _Object, _ObjectType, _TypeClass, _FunctionType, _TypeType
+from zs.ctrt.errors import NameNotFoundError, NameAlreadyExistsError, NoParentScopeError, NameAlreadyBoundError, UnknownMemberError, ReturnInstructionInvoked
 from zs.ctrt.native import NativeObject
 from zs.ctrt.protocols import TypeProtocol, ObjectProtocol, ClassProtocol, MutableClassProtocol, ImmutableClassProtocol, SetterProtocol, GetterProtocol, ScopeProtocol, BindProtocol, \
-    ParameterizedProtocol
-from zs.utils import SingletonMeta
+    CallableProtocol, CallableTypeProtocol
 
 
 class Parameter:
@@ -45,7 +44,7 @@ class Argument(NativeObject, GetterProtocol, SetterProtocol):
         return self.value
 
     def set(self, value: ObjectProtocol):
-        if not self.get_type().is_instance(value):
+        if not self.parameter.type.is_instance(value):
             raise TypeError()
         self.value = value
 
@@ -73,7 +72,7 @@ class Variable(NativeObject, GetterProtocol, SetterProtocol):
         self.value = value
 
 
-class NativeFunction(NativeObject):
+class NativeFunction(NativeObject, CallableProtocol):
     _native: Callable[..., Any]
     _runtime: bool
 
@@ -86,11 +85,14 @@ class NativeFunction(NativeObject):
     def include_runtime(self):
         return self._runtime
 
+    def call(self, args: list[ObjectProtocol]):
+        return self.invoke(*args)
+
     def invoke(self, *args, **kwargs):
         return self._native(*args, **kwargs)
 
 
-class Function(NativeObject, BindProtocol, ParameterizedProtocol):
+class Function(NativeObject, CallableProtocol):
     """
     Represents a Z# function that's used by the ct-runtime interpreter.
     """
@@ -101,7 +103,7 @@ class Function(NativeObject, BindProtocol, ParameterizedProtocol):
         def __init__(self):
             self.nodes = []
 
-    class _BoundFunction:
+    class _BoundFunction(CallableProtocol):
         function: "Function"
         instance: ObjectProtocol
 
@@ -109,15 +111,20 @@ class Function(NativeObject, BindProtocol, ParameterizedProtocol):
             self.function = function
             self.instance = instance
 
+        def call(self, args: list[ObjectProtocol]):
+            return self.function.call([self.instance, args])
+
     name: str | None
     _lexical_scope: "Scope"
     _parameters: list[Parameter]
+    _return_type: TypeProtocol
     _body: Body
 
-    def __init__(self, lexical_scope: "Scope"):
+    def __init__(self, return_type: TypeProtocol, lexical_scope: "Scope"):
         super().__init__()
         self._lexical_scope = lexical_scope
         self._parameters = []
+        self._return_type = return_type
         self._body = self.Body()
 
     @property
@@ -133,14 +140,36 @@ class Function(NativeObject, BindProtocol, ParameterizedProtocol):
         return self._parameters.copy()
 
     @property
+    def return_type(self):
+        return self._return_type
+
+    @property
     def body(self):
         return self._body
 
-    def get_parameter_types(self) -> list[TypeProtocol]:
+    def get_type(self) -> _FunctionType:
+        return _FunctionType(self.get_parameter_types(), self._return_type)
+
+    def get_parameter_types(self):
         return list(map(lambda p: p.type, self._parameters))
 
-    def bind(self, instance: ObjectProtocol):
-        return self._BoundFunction(self, instance)
+    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+        runtime = get_runtime()
+        with runtime.x.frame(self):
+
+            for argument, parameter in zip(args, self.parameters):
+                # unpack the argument into the parameter. if an error has occurred, report it and do NOT call the function
+
+                runtime.x.current_scope.refer(parameter.name, Argument(parameter, argument))
+
+            last = None
+            for instruction in self.body.nodes:
+                try:
+                    last = runtime.execute(instruction)
+                except ReturnInstructionInvoked as e:
+                    return e.value
+
+            return last
 
     def add_parameter(self, name=None, typ=None, index: int = None):
         parameter = Parameter(name, typ, self)
@@ -151,27 +180,65 @@ class Function(NativeObject, BindProtocol, ParameterizedProtocol):
         return parameter
 
 
-class Method(Function):
-    owner: "Class"
-    _static: bool
+# class Method(Function):
+#     owner: "Class"
+#     _static: bool
+#
+#     def __init__(self, owner: "Class", lexical_scope: "Scope", is_static: bool = False):
+#         super().__init__(lexical_scope)
+#         self.owner = owner
+#         self._static = is_static
+#
+#     @property
+#     def is_static(self):
+#         return self._static
+#
+#     @is_static.setter
+#     def is_static(self, value):
+#         self._static = value
 
-    def __init__(self, owner: "Class", lexical_scope: "Scope", is_static: bool = False):
-        super().__init__(lexical_scope)
-        self.owner = owner
-        self._static = is_static
 
-    @property
-    def is_static(self):
-        return self._static
-
-    @is_static.setter
-    def is_static(self, value):
-        self._static = value
-
-
-class FunctionGroup(NativeObject):
+class FunctionGroup(NativeObject, BindProtocol):
     name: str
     _overloads: list[Function]
+
+    class _BoundFunctionGroup(NativeObject, CallableProtocol):
+        group: "FunctionGroup"
+        args: list[ObjectProtocol]
+
+        def __init__(self, group: "FunctionGroup", args: list[ObjectProtocol]):
+            super().__init__()
+            self.group = group
+            self.args = args
+
+        def get_matching_overloads(self, args: list[ObjectProtocol]):
+            return [
+                item.bind(self.args) if isinstance(item, BindProtocol) else item for item in self.group.get_matching_overloads(self.args + args)
+            ]
+
+        def call(self, args: list[ObjectProtocol]):
+            overloads = self.get_matching_overloads(args)
+
+            if not len(overloads):
+                raise TypeError
+            if len(overloads) > 1:
+                raise TypeError
+            return overloads[0].call(self.args + args)
+
+    class _FunctionGroupType(CallableTypeProtocol):
+        def __init__(self, group: "FunctionGroup"):
+            self.group = group
+
+        def compare_type_signature(self, other: "CallableTypeProtocol") -> bool:
+            return any(overload.get_type().compare_type_signature(other) for overload in self.group.overloads)
+
+        def get_type_of_application(self, types: list[TypeProtocol]) -> TypeProtocol:
+            overloads = self.group.get_matching_overloads(types)
+
+            if len(overloads) != 1:
+                raise TypeError
+
+            return overloads[0].return_type
 
     def __init__(self, name: str, *fns: Function):
         super().__init__()
@@ -182,16 +249,25 @@ class FunctionGroup(NativeObject):
     def overloads(self):
         return self._overloads.copy()
 
+    def get_type(self) -> CallableTypeProtocol:
+        return self._FunctionGroupType(self)
+
+    def bind(self, args: list[ObjectProtocol]):
+        return self._BoundFunctionGroup(self, args)
+
     def add_overload(self, fn: Function):
         self._overloads.append(fn)
 
     def get_matching_overloads(self, args: list[ObjectProtocol]):
+        return self.get_matching_overloads_for_types(list(map(lambda arg: arg.get_type(), args)))
+
+    def get_matching_overloads_for_types(self, args: list[TypeProtocol]):
         result = []
         for overload in self._overloads:
             if len(overload.parameters) < len(args):
                 continue
             for parameter, arg in zip(overload.parameters, args):
-                if parameter.type is not None and not parameter.type.is_instance(arg):
+                if parameter.type is not None and not arg.get_type().assignable_to(parameter.type):
                     break
             else:
                 result.append(overload)
@@ -323,7 +399,7 @@ class Scope(ScopeProtocol):
         self.add_local(name, value, type_)
 
 
-class Class(_ObjectType, MutableClassProtocol, ScopeProtocol):
+class Class(_ObjectType, MutableClassProtocol, ScopeProtocol, CallableProtocol):
     """
     Represents a Z# class that's used by the ct-runtime interpreter.
 
@@ -350,7 +426,7 @@ class Class(_ObjectType, MutableClassProtocol, ScopeProtocol):
         return self._constructor
 
     def add_method(self, name: str, method: Function):
-        method.add_parameter(name, self, 0)
+        method.add_parameter("this", self, 0)
         if name not in self._methods:
             group = FunctionGroup(name, method)
             super().add_method(name, group)
@@ -406,16 +482,47 @@ class Class(_ObjectType, MutableClassProtocol, ScopeProtocol):
 
         return instance
 
+    def call(self, args: list[ObjectProtocol]):
+        return self.create_instance(args)
+
     def __str__(self):
         return f"<Z# Class '{self.name if self.name else '{Anonymous}'}' at {hex(id(self))}>"
 
 
-class TypeClass(_TypeClass, ScopeProtocol):
+class TypeClassImplementation(Class):
+    implemented_type: TypeProtocol
+
+    def __init__(self, name: str, lexical_scope: Scope, implemented_type: TypeProtocol):
+        super().__init__(name, None, lexical_scope)
+        self.implemented_type = implemented_type
+
+    def add_method(self, name: str, method: Function):
+        method.add_parameter("this", self.implemented_type, 0)
+        if name not in self._methods:
+            group = FunctionGroup(name, method)
+            _ObjectType.add_method(self, name, group)
+        else:
+            self._methods[name].add_overload(method)
+
+
+class TypeClass(_TypeClass, Class, CallableProtocol):
     name: str
 
-    def __init__(self, name: str):
-        super().__init__()
+    def __init__(self, name: str, lexical_scope: Scope):
+        _TypeClass.__init__(self)
+        Class.__init__(self, name, None, lexical_scope)
         self.name = name
+
+    def get_type(self) -> _FunctionType:
+        return _FunctionType([_TypeType()], _TypeType())
+
+    def call(self, args: list[ObjectProtocol]):
+        if len(args) != 1:
+            raise TypeError
+        type = args[0]
+        if not isinstance(type, TypeProtocol):
+            raise TypeError
+        return self.get_implementation(type)
 
 
 Core = Scope()

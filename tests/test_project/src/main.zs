@@ -134,6 +134,8 @@ print(x);
 
 
 class Foo {
+    fun Foo() {}
+
     fun baz() {
         print("Foo.Foo!");
     }
@@ -151,4 +153,4 @@ print(Bar);
 
 print(class {});
 print(fun(){});
-print(typeclass X {});
+print(typeclass X { fun do(); });

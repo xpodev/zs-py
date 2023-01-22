@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import Callable
 
 from zs.cli.options import Options, get_options
-from zs.ctrt.core import _Object
+from zs.ctrt.core import _Object, _AnyType
 from zs.ctrt.native import NativeObject
 from zs.ctrt.objects import NativeFunction, Core, Scope
+from zs.ctrt.protocols import ObjectProtocol
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter
 from zs.std.objects.compilation_environment import ContextManager

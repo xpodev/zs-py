@@ -4,9 +4,9 @@ from pathlib import Path
 
 from zs.ast.node import Node
 from zs.ast import node_lib as nodes
-from zs.ctrt.core import _NullType
-from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked
-from zs.ctrt.objects import Frame, Function, Scope, NativeFunction, Class, FunctionGroup, Variable, TypeClass, Argument
+from zs.ctrt.core import _NullType, _UnitType
+from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
+from zs.ctrt.objects import Frame, Function, Scope, NativeFunction, Class, FunctionGroup, Variable, TypeClass, Argument, TypeClassImplementation
 from zs.processing import StatefulProcessor, State
 from zs.std.processing.import_system import ImportSystem, ImportResult
 from zs.text.token import TokenType
@@ -252,7 +252,9 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     @_exec
     def _(self, function: nodes.Function):
-        func = Function(self.x.current_scope)
+        return_type = self.execute(function.return_type) if function.return_type is not None else _UnitType()
+
+        func = Function(return_type, self.x.current_scope)
 
         func.name = function.name.name if function.name else None
 
@@ -362,7 +364,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     @_exec
     def _(self, tc: nodes.TypeClass):
-        type_class = TypeClass(tc.name.name)
+        type_class = TypeClass(tc.name.name, self.x.current_scope)
 
         self.x.current_scope.define(type_class.name, type_class)
 
@@ -383,10 +385,27 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         if not isinstance(impl_type, TypeProtocol):
             raise TypeError(f"implementation for typeclass '{type_class.name}' must be a class")
 
-        implementation: Class = Class(f"{type_class.name}.{impl_type}", None, self.x.current_scope)
+        implementation: Class = TypeClassImplementation(f"{type_class.name}.{impl_type}", self.x.current_scope, impl_type)
         with self.x.scope(implementation, value=implementation), self.x.scope_protocol(implementation):
             for item in impl.items:
                 self.execute(item)
+
+        for method in type_class.methods:
+            try:
+                impl = implementation.get_name(None, method.name)
+                #
+                # if isinstance(impl, FunctionGroup._BoundFunctionGroup):
+                #     impl = impl.group
+                # if isinstance(impl, FunctionGroup):
+                #     for overload in impl.overloads:
+                #         if overload.get_type().compare_type_signature(method.get_type()):
+                #             overload.parameters[0].type = impl_type
+                # if isinstance(impl, Function):
+                #     if impl.get_type().compare_type_signature(method.get_type()):
+                #         impl.parameters[0].type = impl_type
+            except UnknownMemberError:
+                # error: not implemented
+                ...
 
         # validate that all items are implemented
 
@@ -493,22 +512,9 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     # runtime implementation functions
 
-    def do_function_call(self, function: Function | NativeFunction, arguments: list[ObjectProtocol]) -> ObjectProtocol:
-        if isinstance(function, NativeFunction):
-            return function.invoke(*arguments)
+    @staticmethod
+    def do_function_call(function: CallableProtocol, arguments: list[ObjectProtocol]) -> ObjectProtocol:
+        if not isinstance(function, CallableProtocol):
+            raise TypeError(f"'function' must implement the callable protocol")
 
-        with self.x.frame(function):
-
-            for argument, parameter in zip(arguments, function.parameters):
-                # unpack the argument into the parameter. if an error has occurred, report it and do NOT call the function
-
-                self.x.current_scope.refer(parameter.name, Argument(parameter, argument))
-
-            last = None
-            for instruction in function.body.nodes:
-                try:
-                    last = self.execute(instruction)
-                except ReturnInstructionInvoked as e:
-                    return e.value
-
-            return last
+        return function.call(arguments)

@@ -5,25 +5,25 @@ Z# interpreter.
 
 from typing import TypeVar, Generic
 
-from .core import _Object, _ObjectType
+from .core import _Object, _ObjectType, _AnyType, _TypeType
 from .errors import UnknownFieldError
 from .protocols import *
 from ..ast.node_lib import While
 
 
 class _TypeMeta(type, _ObjectType):
-    _fields: list[str]
+    _fields: dict[str, "NativeField"]
 
     def __init__(cls, name: str, bases: tuple, namespace: dict):
         super().__init__(name, bases, namespace)
-        cls._fields = list(namespace.get("_fields", ()))
-        cls._fields += [
-            name for name, item in namespace.items() if isinstance(item, ObjectProtocol)
-        ]
+        cls._fields = dict(namespace.get("_fields", ()))
+        cls._fields.update({
+            name: NativeField(name, item) for name, item in namespace.items() if isinstance(item, ObjectProtocol)
+        })
 
     @property
     def fields(self):
-        return self._fields.copy()
+        return list(self._fields.values())
 
     def create_instance(self) -> ObjectProtocol:
         raise RuntimeError
@@ -52,13 +52,10 @@ class _TypeMeta(type, _ObjectType):
                 raise UnknownFieldError()
             return self.get_type().set_name(self, name)
 
-    def is_instance(self, instance: ObjectProtocol) -> bool:
-        if not isinstance(instance, ObjectProtocol):
-            raise TypeError()
-        typ = instance.get_type()
-        if isinstance(typ, _TypeMeta):
-            return typ.is_subclass(self)
-        return instance.get_type() is self
+    def assignable_to(self, target: "TypeProtocol") -> bool:
+        if isinstance(target, _TypeMeta):
+            return target.is_subclass(self)
+        return super().assignable_to(target)
 
     def is_subclass(self, base: TypeProtocol) -> bool:
         if base is self:
@@ -103,9 +100,29 @@ class _TypeMeta(type, _ObjectType):
 _T = TypeVar("_T")
 
 
+class NativeField:
+    class DefaultType(_AnyType):
+        @classmethod
+        def default(cls) -> ObjectProtocol:
+            return None
+
+    def __init__(self, name, value):
+        self.name = name
+        try:
+            self.type = value.get_type()
+        except (TypeError, AttributeError):
+            self.type = self.DefaultType
+        self.value = value
+
+
 class NativeObject(_Object, metaclass=_TypeMeta):
     def __init__(self):
         super().__init__(type(self))
+
+    def __setattr__(self, name, value):
+        if name not in self._fields:
+            self._fields[name] = NativeField(name, value)
+        super().__setattr__(name, value)
 
 
 class NativeValue(ObjectProtocol, Generic[_T]):

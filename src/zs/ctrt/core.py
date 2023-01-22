@@ -1,7 +1,8 @@
 from typing import Optional
 
 from zs.ctrt.errors import FieldAlreadyDefinedError, MemberAlreadyDefinedError, UnknownMemberError, NameNotFoundError
-from zs.ctrt.protocols import ClassProtocol, TypeProtocol, ObjectProtocol, SetterProtocol, GetterProtocol, BindProtocol, ParameterizedProtocol, ScopeProtocol
+from zs.ctrt.protocols import ClassProtocol, TypeProtocol, ObjectProtocol, SetterProtocol, GetterProtocol, BindProtocol, ScopeProtocol, _PartialCallImpl, CallableProtocol, \
+    DefaultCallableProtocol, CallableTypeProtocol
 from zs.utils import SingletonMeta
 
 
@@ -13,8 +14,8 @@ class _TypeType(TypeProtocol, metaclass=SingletonMeta):
     def get_type(self) -> TypeProtocol:
         return _TypeType()
 
-    def is_instance(self, instance: ObjectProtocol) -> bool:
-        return isinstance(instance, TypeProtocol)
+    def assignable_from(self, source: "TypeProtocol") -> bool:
+        return isinstance(source, _TypeType)
 
     @classmethod
     def default(cls) -> ObjectProtocol:
@@ -29,7 +30,10 @@ class _VoidType(TypeProtocol):
     def get_type(self) -> TypeProtocol:
         return _TypeType()
 
-    def is_instance(self, _) -> bool:
+    def assignable_to(self, _: "TypeProtocol") -> bool:
+        return False
+
+    def assignable_from(self, _: "TypeProtocol") -> bool:
         return False
 
     @classmethod
@@ -51,8 +55,8 @@ class _UnitType(TypeProtocol, metaclass=SingletonMeta):
     def get_type(self) -> TypeProtocol:
         return _TypeType()
 
-    def is_instance(self, instance: ObjectProtocol) -> bool:
-        return instance is self.Instance
+    def assignable_from(self, source: "TypeProtocol") -> bool:
+        return source is self
 
     @classmethod
     def default(cls) -> ObjectProtocol:
@@ -70,12 +74,15 @@ class _AnyType(TypeProtocol, metaclass=SingletonMeta):
     def is_instance(self, instance: ObjectProtocol) -> bool:
         return isinstance(instance, ObjectProtocol)
 
+    def assignable_from(self, source: "TypeProtocol") -> bool:
+        return isinstance(source, TypeProtocol)
+
     @classmethod
     def default(cls) -> ObjectProtocol:
         raise TypeError(f"`any` doesn't have a default value because it is an abstract type.")
 
 
-class _FunctionType(TypeProtocol, ParameterizedProtocol):
+class _FunctionType(TypeProtocol, DefaultCallableProtocol):
     def __init__(self, parameters: list[TypeProtocol], returns: TypeProtocol):
         self.parameters = parameters
         self.returns = returns
@@ -83,24 +90,28 @@ class _FunctionType(TypeProtocol, ParameterizedProtocol):
     def get_type(self) -> "TypeProtocol":
         return _TypeType()
 
-    def is_instance(self, instance: ObjectProtocol) -> bool:
-        if not isinstance(instance, ParameterizedProtocol):
-            raise TypeError(f"Only parameterized object may be checked for function compatibility")
-        if instance.get_return_type() != self.returns:
+    def assignable_from(self, source: "TypeProtocol") -> bool:
+        if not isinstance(source, CallableTypeProtocol):
             return False
-        parameters = instance.get_parameter_types()
-        if len(parameters) != len(self.parameters):
-            return False
-        for parameter1, parameter2 in zip(parameters, self.parameters):
-            if parameter1 != parameter2:
-                return False
-        return True
 
-    def get_parameter_types(self) -> list[TypeProtocol]:
-        return self.parameters.copy()
+        return self.compare_type_signature(source)
 
-    def get_return_type(self) -> TypeProtocol:
+    def get_type_of_application(self, types: list[TypeProtocol]) -> TypeProtocol:
+        if len(types) != len(self.parameters):
+            raise TypeError
+        for type, parameter in zip(types, self.parameters):
+            if not type.assignable_to(parameter):
+                raise TypeError
         return self.returns
+
+    def compare_type_signature(self, other: CallableTypeProtocol) -> bool:
+        try:
+            if not other.get_type_of_application(self.parameters).assignable_to(self.returns):
+                return False
+        except TypeError:
+            return False
+
+        return True
 
 
 class _Object(ObjectProtocol):
@@ -172,7 +183,7 @@ class _ObjectType(_Object, ClassProtocol):
             if not isinstance(instance, _Object):
                 raise TypeError(f"'instance' must be a valid Z# OOP object.")
 
-            if not self.type.is_instance(value):
+            if not self.type.is_instance(instance):
                 raise TypeError(f"'value' must be an instance of type '{self.type}'")
             if self.is_static:
                 self._owner.data[self.index] = value
@@ -218,27 +229,27 @@ class _ObjectType(_Object, ClassProtocol):
 
     Instance = None
 
-    _fields: dict[str, _Field]
-    _methods: dict[str, _Method]
+    _fields: list[_Field]
+    _methods: list[_Method]
     _items: dict[str, _Field | _Method]
 
     def __init__(self, metaclass: Optional["_ObjectType"] = None):
         super().__init__(metaclass or self.Instance)
         if self.Instance is None:
             self.Instance = self
-        self._fields = {}
-        self._methods = {}
+        self._fields = []
+        self._methods = []
         self._items = {}
 
     def add_field(self, name: str, type: TypeProtocol, initializer: ObjectProtocol | None):
-        if name in self._fields:
-            raise FieldAlreadyDefinedError(f"Field '{name}' is already defined in type '{self}'")
         if name in self._items:
             raise MemberAlreadyDefinedError(f"Type '{self}' already defines a member '{name}'")
-        self._items[name] = self._fields[name] = self._Field(name, type, len(self._fields), initializer, self)
+        self._items[name] = field = self._Field(name, type, len(self._fields), initializer, self)
+        self._fields.append(field)
 
     def add_method(self, name: str, method):
-        self._items[name] = self._methods[name] = method
+        self._items[name] = method
+        self._methods.extend(method.overloads)
 
     def get_base(self) -> ClassProtocol | None:
         return None
@@ -249,18 +260,19 @@ class _ObjectType(_Object, ClassProtocol):
         try:
             member = self._items[name]
             if isinstance(member, BindProtocol):
-                return member.bind(instance or self)
+                return member.bind([instance or self])
             return member
         except KeyError:
             raise UnknownMemberError(f"Type '{self}' does not define member '{name}'")
 
-    def is_instance(self, instance: ObjectProtocol) -> bool:
-        type = instance.get_type()
+    def set_name(self, instance: ObjectProtocol | None, name: str, value: ObjectProtocol):
+        ...
 
-        if not isinstance(type, ClassProtocol):
-            return False
+    def assignable_to(self, target: "TypeProtocol") -> bool:
+        if not isinstance(target, _ObjectType):
+            return super().assignable_to(target)
 
-        return type.is_subclass(self)
+        return self.is_subclass(target)
 
     def is_subclass(self, base: "_ObjectType"):
         if not isinstance(base, ClassProtocol):
@@ -280,19 +292,29 @@ class _ObjectType(_Object, ClassProtocol):
 
     @property
     def fields(self):
-        return list(self._fields.values())
+        return self._fields.copy()
 
     @property
     def methods(self):
-        return list(self._methods.values())
+        return self._methods.copy()
 
 
-class _NullableType(_ObjectType):
-    def is_instance(self, instance: ObjectProtocol) -> bool:
-        if instance is _NullType.Instance:
+class _NullableType(TypeProtocol):
+    _type: _ObjectType
+
+    def __init__(self, type: _ObjectType):
+        if not isinstance(type, _ObjectType):
+            raise TypeError("Nullables may only be used with class types")
+        self._type = type
+
+    def get_type(self) -> "TypeProtocol":
+        return _TypeType()
+
+    def assignable_from(self, source: "TypeProtocol") -> bool:
+        if source is self:
             return True
 
-        return super().is_instance(instance)
+        return source.assignable_to(self._type)
 
     @classmethod
     def default(cls) -> ObjectProtocol:
@@ -320,16 +342,13 @@ class _NullType(_ObjectType, metaclass=SingletonMeta):
     def get_type(self) -> "TypeProtocol":
         return _TypeType()
 
-    def is_instance(self, instance: ObjectProtocol) -> bool:
-        return instance is self.Instance
-
     @classmethod
     def default(cls) -> ObjectProtocol:
         raise TypeError(f"`null` type doesn't have a default value because it may not be instantiated.")
 
 
 class _TypeClass(_ObjectType):
-    class _TypeClassImplementation:
+    class _TypeClassImplementationInfo:
         type: TypeProtocol
         implementation: _ObjectType
         type_class: "_TypeClass"
@@ -339,14 +358,24 @@ class _TypeClass(_ObjectType):
             self.implementation = implementation
             self.type_class = type_class
 
-    _implementations: dict[TypeProtocol, _TypeClassImplementation]
+    # class _TypeClassImplementation(_ObjectType):
+    #     type: _ObjectType
+    #
+    #     def __init__(self, type):
+    #         self.type = type
+    #         super().__init__(None)
+    #
+    #     def get_name(self, instance: ObjectProtocol | None, name: str):
+    #         return self.type.get_name(instance, name)
+
+    _implementations: dict[TypeProtocol, _TypeClassImplementationInfo]
 
     def __init__(self):
-        super().__init__()
+        _ObjectType.__init__(self)
         self._implementations = {}
 
-    def is_instance(self, instance: ObjectProtocol) -> bool:
-        return instance.get_type() in self._implementations
+    def assignable_from(self, source: "TypeProtocol") -> bool:
+        return source in self._implementations
 
     def get_name(self, instance: ObjectProtocol | None, name: str):
         try:
@@ -357,4 +386,7 @@ class _TypeClass(_ObjectType):
     def add_implementation(self, type: TypeProtocol, implementation: _ObjectType):
         if type in self._implementations:
             raise TypeError(f"type '{type}' already implements '{self}'")
-        self._implementations[type] = self._TypeClassImplementation(type, implementation, self)
+        self._implementations[type] = self._TypeClassImplementationInfo(type, implementation, self)
+
+    def get_implementation(self, type: TypeProtocol) -> _ObjectType:
+        return self._implementations[type].implementation

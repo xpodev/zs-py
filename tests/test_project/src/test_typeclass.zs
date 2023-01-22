@@ -10,6 +10,9 @@ typeclass IPrint {
 typeclass IPrint(Foo) {
     fun print() {
         Foo.baz();
+        Python.print(IPrint(Foo).print);
+        Python.print(print);
+        Python.print(this);
     }
 }
 
@@ -19,4 +22,4 @@ fun do_print(x: IPrint)
     x.print();
 }
 
-do_print(create_instance_of(Foo));
+do_print(Foo());
