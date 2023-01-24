@@ -181,7 +181,7 @@ class NativeObject(_Object, metaclass=_TypeMeta):
         super().__setattr__(name, value)
 
 
-class NativeFunction(NativeObject, CallableProtocol):
+class NativeFunction(NativeObject, CallableProtocol, BindProtocol):
     name: str
     _native: Callable[..., Any]
 
@@ -198,6 +198,11 @@ class NativeFunction(NativeObject, CallableProtocol):
 
     def invoke(self, *args, **kwargs):
         return self._native(*args, **kwargs)
+
+    def bind(self, args: list[ObjectProtocol]):
+        if isinstance(self._native, staticmethod):
+            return self
+        return NativeFunction(partial(self._native, *args))
 
     def __call__(self, *args, **kwargs):
         return self.invoke(*args, **kwargs)
