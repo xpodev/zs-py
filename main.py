@@ -92,7 +92,6 @@ def main(options: Options):
         item = getattr(__builtins__, name)
         if callable(item):
             setattr(builtins, name, NativeFunction(item))
-    builtins.create_instance_of = NativeFunction(lambda typ: _Object(typ))
 
     compiler.toolchain.interpreter.x.global_scope.refer("Python", builtins)
 

@@ -1,4 +1,4 @@
-import { print, create_instance_of } from Python;
+import { print } from Python;
 import { Foo } from "src/main.zs";
 
 
