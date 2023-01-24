@@ -324,9 +324,9 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     def _(self, literal: nodes.Literal):
         value = literal.token_info.literal.value
         if value == "true":
-            return Boolean(True)
+            return Boolean.TRUE
         if value == "false":
-            return Boolean(False)
+            return Boolean.FALSE
         if value == "null":
             return _NullType.Instance
         match literal.token_info.literal.type:
