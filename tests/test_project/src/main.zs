@@ -7,11 +7,15 @@ fun print2(value) {
 }
 
 fun no_print() {
-    print("this should not print");
+    print("This should not be printed.");
 }
 
+var v1 = "blah";
 {
+    var v1 = "blah in a block";
     print("Block!");
+
+    print(v1);
 }
 
 if (true) {

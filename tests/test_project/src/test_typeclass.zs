@@ -17,9 +17,25 @@ typeclass IPrint(Foo) {
 }
 
 
+typeclass IPrint(i64) {
+    fun print() {
+        Python.print("Number", this);
+    }
+}
+
+
+typeclass IPrint(f64) {
+    fun print() {
+        Python.print("Float!,", this);
+    }
+}
+
+
 fun do_print(x: IPrint)
 {
     x.print();
 }
 
 do_print(Foo());
+do_print(45);
+do_print(3.14);

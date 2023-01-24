@@ -233,13 +233,13 @@ class FunctionGroup(NativeObject, BindProtocol):
     def get_matching_overloads(self, args: list[ObjectProtocol]):
         return self.get_matching_overloads_for_types(list(map(lambda arg: arg.runtime_type, args)))
 
-    def get_matching_overloads_for_types(self, args: list[TypeProtocol]):
+    def get_matching_overloads_for_types(self, arg_types: list[TypeProtocol]):
         result = []
         for overload in self._overloads:
-            if len(overload.parameters) < len(args):
+            if len(overload.parameters) < len(arg_types):
                 continue
-            for parameter, arg in zip(overload.parameters, args):
-                if parameter.type is not None and not arg.runtime_type.assignable_to(parameter.type):
+            for parameter, arg_type in zip(overload.parameters, arg_types):
+                if parameter.type is not None and not arg_type.assignable_to(parameter.type):
                     break
             else:
                 result.append(overload)
