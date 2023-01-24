@@ -406,6 +406,7 @@ class Class(_ObjectType, MutableClassProtocol, ScopeProtocol, CallableProtocol):
             self._methods[name].add_overload(method)
 
     def add_constructor(self, constructor: Function):
+        constructor.add_parameter("this", self, 0)
         self._constructor.add_overload(constructor)
 
     def define(self, name: str, value: Function | Variable = None):
@@ -443,8 +444,10 @@ class Class(_ObjectType, MutableClassProtocol, ScopeProtocol, CallableProtocol):
         instance = _Object(self)
 
         runtime = get_runtime()
-        overloads = self.constructor.get_matching_overloads(args)
+        overloads = self.constructor.get_matching_overloads([instance, *args])
 
+        if not len(overloads):
+            raise TypeError(f"Could not find a suitable overload")
         if len(overloads) != 1:
             raise TypeError(f"Too many overloads match the given arguments")
 

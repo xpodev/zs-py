@@ -276,6 +276,8 @@ class String(NativeValue[str]):
 class Int64(NativeValue[int]):
     @native_fn("_+_")
     def __add__(self: "Int64", right: "Int64"):
+        if not isinstance(right, Int64):
+            raise TypeError
         return Int64(self.native + right.native)
 
     @classmethod

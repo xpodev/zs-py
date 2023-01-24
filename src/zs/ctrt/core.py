@@ -220,14 +220,17 @@ class _ObjectType(_Object, ClassProtocol):
             if not isinstance(instance, _Object):
                 raise TypeError(f"'instance' must be a valid Z# OOP object.")
 
-            if not self.type.is_instance(instance):
+            if not self.type.is_instance(value):
                 raise TypeError(f"'value' must be an instance of type '{self.type}'")
             if self.is_static:
                 self._owner.data[self.index] = value
             else:
                 instance.data[self.index] = value
 
-        def bind(self, instance: "_Object") -> "_ObjectType._BoundField":
+        def bind(self, args: [ObjectProtocol]) -> "_ObjectType._BoundField":
+            if len(args) != 1:
+                raise TypeError(f"May only bind a field to a single instance")
+            instance = args[0]
             if not isinstance(instance, _Object):
                 raise TypeError("A field may only be bound to OOP objects.")
             if not self.is_static:

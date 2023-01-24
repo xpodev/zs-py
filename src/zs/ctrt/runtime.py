@@ -166,12 +166,12 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             self._x = context
 
     @contextmanager
-    def srf_access(self):
-        self._srf_access = True
+    def srf_access(self, srf=True):
+        self._srf_access, old = srf, self._srf_access
         try:
             yield
         finally:
-            self._srf_access = False
+            self._srf_access = old
 
     def execute(self, node: Node):
         return self._execute(node)
@@ -192,10 +192,10 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         with self.srf_access():
             target = self.execute(assign.left)
 
-            if not isinstance(target, SetterProtocol):
-                self.state.error(f"Could not assign to '{assign.left}' because it does not implement the setter protocol", assign)
+        if not isinstance(target, SetterProtocol):
+            self.state.error(f"Could not assign to '{assign.left}' because it does not implement the setter protocol", assign)
 
-            target.set(self.execute(assign.right))
+        target.set(self.execute(assign.right))
 
     @_exec
     def _(self, binary: nodes.Binary):
@@ -351,7 +351,8 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     def _(self, member_access: nodes.MemberAccess):
         with self.srf_access():
             obj_srf = self.execute(member_access.object)
-        obj = self.execute(member_access.object)
+        with self.srf_access(False):
+            obj = self.execute(member_access.object)
         return self.do_get_member(obj_srf, obj, member_access.member.name)
 
     @_exec

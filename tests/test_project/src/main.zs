@@ -173,14 +173,16 @@ print("z + 5 =", z + 5);
 print(y.length());
 
 
-class One {
-    fun One() {
-
+class Number {
+    fun Number(x) {
+        this.x = x;
     }
 
     fun "_+_"(other) {
-        return other + 1;
+        return Number(1 + other);
     }
+
+    var x: i64;
 }
 
-print(One() + 3);
+print(Number(2) + 3);
