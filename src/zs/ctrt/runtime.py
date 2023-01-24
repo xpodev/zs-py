@@ -6,7 +6,7 @@ from zs.ast.node import Node
 from zs.ast import node_lib as nodes
 from zs.ctrt.core import _NullType, _UnitType, _AnyType
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
-from zs.ctrt.objects import Frame, Function, Scope, NativeFunction, Class, FunctionGroup, Variable, TypeClass, Argument, TypeClassImplementation
+from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
 from zs.processing import StatefulProcessor, State
 from zs.std.processing.import_system import ImportSystem, ImportResult
 from zs.text.token import TokenType
