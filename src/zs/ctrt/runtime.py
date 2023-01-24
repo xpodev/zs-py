@@ -4,7 +4,7 @@ from pathlib import Path
 
 from zs.ast.node import Node
 from zs.ast import node_lib as nodes
-from zs.ctrt.core import _NullType, _UnitType, _AnyType
+from zs.ctrt.core import _NullType, _UnitType, _AnyType, Null
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
 from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
 from zs.processing import StatefulProcessor, State
@@ -328,7 +328,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         if value == "false":
             return Boolean.FALSE
         if value == "null":
-            return _NullType.Instance
+            return Null.Instance
         match literal.token_info.literal.type:
             case TokenType.String:
                 return String(value)
