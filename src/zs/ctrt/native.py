@@ -125,6 +125,28 @@ class NativeObject(_Object, metaclass=_TypeMeta):
         super().__setattr__(name, value)
 
 
+class NativeFunction(NativeObject, CallableProtocol):
+    name: str
+    _native: Callable[..., Any]
+
+    def __init__(self, native: Callable[..., Any], name: str = None):
+        super().__init__()
+        self._native = native
+        try:
+            self.name = name or native.__name__
+        except AttributeError:
+            self.name = ''
+
+    def call(self, args: list[ObjectProtocol]):
+        return self.invoke(*args)
+
+    def invoke(self, *args, **kwargs):
+        return self._native(*args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        return self.invoke(*args, **kwargs)
+
+
 class NativeValue(ObjectProtocol, Generic[_T]):
     Type: TypeProtocol  # implement on class level
 

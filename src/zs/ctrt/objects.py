@@ -1,11 +1,11 @@
-from typing import Optional, Any, Callable
+from typing import Optional, Any
 
 from zs.ast.node import Node
 from zs.ctrt import get_runtime
 from zs.ctrt.core import _Object, _ObjectType, _TypeClass, _FunctionType, _TypeType
-from zs.ctrt.errors import NameNotFoundError, NameAlreadyExistsError, NoParentScopeError, NameAlreadyBoundError, UnknownMemberError, ReturnInstructionInvoked
+from zs.ctrt.errors import NameNotFoundError, NameAlreadyExistsError, NoParentScopeError, UnknownMemberError, ReturnInstructionInvoked
 from zs.ctrt.native import NativeObject
-from zs.ctrt.protocols import TypeProtocol, ObjectProtocol, ClassProtocol, MutableClassProtocol, ImmutableClassProtocol, SetterProtocol, GetterProtocol, ScopeProtocol, BindProtocol, \
+from zs.ctrt.protocols import TypeProtocol, ObjectProtocol, ClassProtocol, MutableClassProtocol, SetterProtocol, GetterProtocol, ScopeProtocol, BindProtocol, \
     CallableProtocol, CallableTypeProtocol
 
 
@@ -70,26 +70,6 @@ class Variable(NativeObject, GetterProtocol, SetterProtocol):
         if not self.type.is_instance(value):
             raise TypeError(f"Can't assign value of type '{value.get_type()}' to variable of type '{self.type}'")
         self.value = value
-
-
-class NativeFunction(NativeObject, CallableProtocol):
-    _native: Callable[..., Any]
-    _runtime: bool
-
-    def __init__(self, native: Callable[..., Any], include_runtime: bool = False):
-        super().__init__()
-        self._native = native
-        self._runtime = include_runtime
-
-    @property
-    def include_runtime(self):
-        return self._runtime
-
-    def call(self, args: list[ObjectProtocol]):
-        return self.invoke(*args)
-
-    def invoke(self, *args, **kwargs):
-        return self._native(*args, **kwargs)
 
 
 class Function(NativeObject, CallableProtocol):
