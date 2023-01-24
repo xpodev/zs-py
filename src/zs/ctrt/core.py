@@ -112,7 +112,7 @@ class _NullType(TypeProtocol, metaclass=SingletonMeta):
     def __init__(self):
         super().__init__()
         if self.Instance is None:
-            self.Instance = self._Null(self)
+            _NullType.Instance = self._Null(self)
         self.runtime_type = Type
 
     @classmethod
