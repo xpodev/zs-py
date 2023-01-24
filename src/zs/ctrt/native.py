@@ -105,6 +105,9 @@ class _NativeTypeMeta(type, TypeProtocol):
     def default(cls) -> ObjectProtocol:
         return cls.default()
 
+    def __str__(self):
+        return type.__str__(self)
+
 
 class NativeType(metaclass=_NativeTypeMeta):
     ...
@@ -171,7 +174,7 @@ class NativeField:
         self.value = value or type.default()
 
 
-class NativeObject(_Object, metaclass=_TypeMeta):
+class NativeObject(_Object, metaclass=_NativeClassMeta):
     def __init__(self):
         super().__init__(type(self))
 

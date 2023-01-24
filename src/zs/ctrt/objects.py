@@ -461,7 +461,7 @@ class Class(_ObjectType, MutableClassProtocol, ScopeProtocol, CallableProtocol):
         return self.create_instance(args)
 
     def __str__(self):
-        return f"<Z# Class '{self.name if self.name else '{Anonymous}'}' at {hex(id(self))}>"
+        return f"<Z# Class '{self.name if self.name else '{Anonymous}'}'>"
 
 
 class TypeClassImplementation(Class):

@@ -199,6 +199,9 @@ class _Object(ObjectProtocol):
     def data(self):
         return self._data
 
+    def __str__(self):
+        return f"<Z# object of type {self.runtime_type}>"
+
 
 class _ObjectType(_Object, ClassProtocol):
     """
