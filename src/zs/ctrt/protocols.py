@@ -14,8 +14,9 @@ class ObjectProtocol:
     The only thing an object has to have is the `get_type()` function, which should return an object that
     implements the `TypeProtocol` protocol.
     """
+    runtime_type: "TypeProtocol"
 
-    def get_type(self) -> "TypeProtocol": ...
+    # def get_type(self) -> "TypeProtocol": ...
 
 
 class TypeProtocol(ObjectProtocol):
@@ -30,7 +31,7 @@ class TypeProtocol(ObjectProtocol):
         """
         Returns whether the given instance is an instance of this type
         """
-        return instance.get_type().assignable_to(self)
+        return instance.runtime_type.assignable_to(self)
 
     def assignable_to(self, target: "TypeProtocol") -> bool:
         """
@@ -124,10 +125,7 @@ class BindProtocol:
 
 
 class CallableProtocol(ObjectProtocol):
-    def get_type(self) -> "CallableTypeProtocol":
-        """
-        Returns the type of this callable (will usually be an instance of the _FunctionType class)
-        """
+    runtime_type: "CallableTypeProtocol"
 
     def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
         """
@@ -172,23 +170,21 @@ class _PartialCallImpl(DefaultCallableProtocol):
             return self.origin.get_type_of_application(self.bound + types)
 
         def compare_type_signature(self, other: "CallableProtocol") -> bool:
-            return other.get_type().compare_type_signature(self.origin)
+            return other.runtime_type.compare_type_signature(self.origin)
 
     def __init__(self, callable_: CallableProtocol, args: list[ObjectProtocol]):
         self.callable = callable_
         self.args = args
-
-    def get_type(self) -> "CallableTypeProtocol":
-        return self._PartialCallImplType(self.get_bound_argument_types(), self.callable.get_type())
+        self.runtime_type = self._PartialCallImplType(self.get_bound_argument_types(), self.callable.runtime_type)
 
     def get_bound_argument_types(self):
-        return list(map(lambda arg: arg.get_type(), self.args))
+        return list(map(lambda arg: arg.runtime_type, self.args))
 
     def get_type_of_application(self, types: list[TypeProtocol]) -> TypeProtocol:
-        return self.callable.get_type().get_type_of_application(self.get_bound_argument_types() + types)
+        return self.callable.runtime_type.get_type_of_application(self.get_bound_argument_types() + types)
 
     def compare_type_signature(self, other: "CallableTypeProtocol") -> bool:
-        return other.compare_type_signature(self.get_type())
+        return other.compare_type_signature(self.runtime_type)
 
     def call(self, args: list[ObjectProtocol]):
         return super().call(self.args + args)

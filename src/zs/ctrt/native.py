@@ -6,7 +6,7 @@ Z# interpreter.
 from functools import partial
 from typing import TypeVar, Generic, Callable, Any, Union
 
-from .core import _Object, _ObjectType, _AnyType
+from .core import _Object, _ObjectType, _AnyType, _TypeType
 from .errors import UnknownFieldError
 from .protocols import *
 from .protocols import CallableProtocol, ObjectProtocol
@@ -38,6 +38,9 @@ class _TypeMeta(type, _ObjectType):
         cls._items.update(cls._fields)
         cls._items.update(cls._methods)
 
+    def default(cls):
+        return cls.default()
+
     @property
     def fields(self):
         return list(self._fields.values())
@@ -52,7 +55,7 @@ class _TypeMeta(type, _ObjectType):
         except KeyError:
             if self is _TypeMeta:
                 raise UnknownFieldError()
-            return self.get_type().get_name(self, name)
+            return self.runtime_type.get_name(self, name)
         else:
             if isinstance(attr, GetterProtocol):
                 attr = attr.get()
@@ -68,7 +71,7 @@ class _TypeMeta(type, _ObjectType):
         except KeyError:
             if self is _TypeMeta:
                 raise UnknownFieldError()
-            return self.get_type().set_name(self, name, value)
+            return self.runtime_type.set_name(self, name, value)
         if isinstance(attr, SetterProtocol):
             attr.set(value)
         else:
@@ -89,6 +92,45 @@ class _TypeMeta(type, _ObjectType):
             if isinstance(base_, _TypeMeta) and base_.is_subclass(base):
                 return True
         return False
+
+
+class _NativeTypeMeta(type, TypeProtocol):
+    def __init__(cls, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        cls.runtime_type = _TypeType()
+
+    def assignable_from(self, source: "TypeProtocol") -> bool:
+        return isinstance(source, TypeProtocol)
+
+    def default(cls) -> ObjectProtocol:
+        return cls.default()
+
+
+class NativeType(metaclass=_NativeTypeMeta):
+    ...
+
+
+class _NativeClassMeta(_NativeTypeMeta, _ObjectType):
+    def __init__(cls, name: str, bases: tuple, namespace: dict):
+        super().__init__(name, bases, namespace)
+        _ObjectType.__init__(cls)
+
+        for name, item in namespace.items():
+            if not isinstance(item, ObjectProtocol):
+                continue
+            elif isinstance(item, NativeFunction):
+                cls.add_method(item.name or name, item)
+            elif isinstance(item, NativeField):
+                cls.add_field(item.name or name, item.type, item.value)
+
+
+class NativeClass(_Object, metaclass=_NativeClassMeta):
+    def __init__(self):
+        super().__init__(type(self))
+
+
+class _Type(metaclass=_TypeMeta):
+    ...
 
 
 # class NativeObject(ObjectProtocol, metaclass=_TypeMeta):
@@ -122,29 +164,11 @@ class _TypeMeta(type, _ObjectType):
 _T = TypeVar("_T")
 
 
-class NativeField(GetterProtocol, SetterProtocol):
-    class DefaultType(_AnyType):
-        @classmethod
-        def default(cls) -> ObjectProtocol:
-            return None
-
-    DefaultType = DefaultType()
-
-    def __init__(self, name, value):
+class NativeField:
+    def __init__(self, type: TypeProtocol, value=None, name: str = None):
         self.name = name
-        try:
-            self.type = value.get_type()
-        except (TypeError, AttributeError):
-            self.type = self.DefaultType
-        self.value = value
-
-    def get(self):
-        return self.value
-
-    def set(self, value: ObjectProtocol):
-        if not value.get_type().assignable_to(self.type):
-            raise TypeError
-        self.value = value
+        self.type = type
+        self.value = value or type.default()
 
 
 class NativeObject(_Object, metaclass=_TypeMeta):
@@ -179,20 +203,23 @@ class NativeFunction(NativeObject, CallableProtocol):
         return self.invoke(*args, **kwargs)
 
 
-class NativeValue(ObjectProtocol, Generic[_T]):
+class NativeValue(NativeClass, Generic[_T]):
     Type: TypeProtocol  # implement on class level
 
     _native: _T
 
     def __init__(self, native: _T):
+        super().__init__()
         self._native = native
+        self.runtime_type = type(self)
 
     @property
     def native(self):
         return self._native
 
-    def get_type(self) -> TypeProtocol:
-        return self.Type
+    @classmethod
+    def default(cls):
+        return cls.Type.default()
 
     # Python stuff
 
@@ -212,10 +239,6 @@ class NativeValue(ObjectProtocol, Generic[_T]):
         return self._native == other
 
 
-class _Type(metaclass=_TypeMeta):
-    ...
-
-
 # interop utility
 
 
@@ -233,46 +256,48 @@ def native_fn(name: str = None):
 
 
 class String(NativeValue[str]):
-    class Type(_Type):
-        @classmethod
-        def default(cls):
-            return String("")
+    @classmethod
+    def default(cls):
+        return cls("")
 
-        @native_fn("_+_")
-        @staticmethod
-        def add(left: "String", right: "String"):
-            return String(left.native + right.native)
+    @native_fn("_+_")
+    @staticmethod
+    def add(left: "String", right: "String"):
+        return String(left.native + right.native)
 
 
 class Int64(NativeValue[int]):
-    class Type(_Type):
-        @classmethod
-        def default(cls):
-            return Int64(0)
+    @native_fn("_+_")
+    @staticmethod
+    def add(left: "Int64", right: "Int64"):
+        return Int64(left.native + right.native)
 
-        @native_fn("_+_")
-        @staticmethod
-        def add(left: "Int64", right: "Int64"):
-            return Int64(left.native + right.native)
+    @classmethod
+    def default(cls):
+        return cls(0)
 
 
 class Float64(NativeValue[float]):
-    class Type(_Type):
-        @classmethod
-        def default(cls):
-            return Float64(0.0)
+    @classmethod
+    def default(cls):
+        return cls(0.0)
 
-        @native_fn("_+_")
-        @staticmethod
-        def add(left: "Float64", right: "Float64"):
-            return Float64(left.native + right.native)
+    @native_fn("_+_")
+    @staticmethod
+    def add(left: "Float64", right: "Float64"):
+        return Float64(left.native + right.native)
 
 
 class Boolean(NativeValue[bool]):
-    class Type(_Type):
-        @classmethod
-        def default(cls):
-            return Boolean(False)
+    @classmethod
+    def default(cls):
+        return cls.FALSE
+
+    TRUE = FALSE = None
+
+
+Boolean.TRUE = Boolean(True)
+Boolean.FALSE = Boolean(False)
 
 
 # Utility

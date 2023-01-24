@@ -11,8 +11,8 @@ class _TypeType(TypeProtocol, metaclass=SingletonMeta):
     The `type` type. This type is the base class of all Z# types.
     """
 
-    def get_type(self) -> TypeProtocol:
-        return _TypeType()
+    def __init__(self):
+        self.runtime_type = self
 
     def assignable_from(self, source: "TypeProtocol") -> bool:
         return isinstance(source, _TypeType)
@@ -22,13 +22,16 @@ class _TypeType(TypeProtocol, metaclass=SingletonMeta):
         return cls()
 
 
+Type = _TypeType()
+
+
 class _VoidType(TypeProtocol, metaclass=SingletonMeta):
     """
     The `void` type. This type doesn't have any instances.
     """
 
-    def get_type(self) -> TypeProtocol:
-        return _TypeType()
+    def __init__(self):
+        self.runtime_type = Type
 
     def assignable_to(self, _: "TypeProtocol") -> bool:
         return False
@@ -41,19 +44,24 @@ class _VoidType(TypeProtocol, metaclass=SingletonMeta):
         raise TypeError(f"`void` doesn't have a default value because it can't be instantiated")
 
 
+Void = _VoidType()
+
+
 class _UnitType(TypeProtocol, metaclass=SingletonMeta):
     """
     The `unit` type. This type only has 1 instance, the unit instance `()`.
     """
 
-    class _Unit(ObjectProtocol):
-        def get_type(self) -> TypeProtocol:
-            return _UnitType()
+    class _Unit(ObjectProtocol, metaclass=SingletonMeta):
+        def __init__(self, unit_type: "_UnitType"):
+            self.runtime_type = unit_type
 
-    Instance = _Unit()
+    Instance = None
 
-    def get_type(self) -> TypeProtocol:
-        return _TypeType()
+    def __init__(self):
+        if self.Instance is None:
+            self.Instance = self._Unit(self)
+        self.runtime_type = Type
 
     def assignable_from(self, source: "TypeProtocol") -> bool:
         return source is self
@@ -63,13 +71,16 @@ class _UnitType(TypeProtocol, metaclass=SingletonMeta):
         return cls.Instance
 
 
+Unit = _UnitType()
+
+
 class _AnyType(TypeProtocol, metaclass=SingletonMeta):
     """
     The `any` type. This type is compatible with all Z# types (ObjectProtocol).
     """
 
-    def get_type(self) -> TypeProtocol:
-        return _TypeType()
+    def __init__(self):
+        self.runtime_type = Type
 
     def is_instance(self, instance: ObjectProtocol) -> bool:
         return isinstance(instance, ObjectProtocol)
@@ -82,13 +93,41 @@ class _AnyType(TypeProtocol, metaclass=SingletonMeta):
         raise TypeError(f"`any` doesn't have a default value because it is an abstract type.")
 
 
-class _FunctionType(CallableTypeProtocol, DefaultCallableProtocol):
+Any = _AnyType()
+
+
+class _NullType(TypeProtocol, metaclass=SingletonMeta):
+    """
+    The type of the `null` value. This value is places in the bottom of the inheritance tree and can
+    be case to all object types.
+    """
+
+    class _Null(ObjectProtocol, metaclass=SingletonMeta):
+        def __init__(self, null_type: "_NullType"):
+            super().__init__()
+            self.runtime_type = null_type
+
+    Instance: _Null = None
+
+    def __init__(self):
+        super().__init__()
+        if self.Instance is None:
+            self.Instance = self._Null(self)
+        self.runtime_type = Type
+
+    @classmethod
+    def default(cls) -> ObjectProtocol:
+        raise TypeError(f"`null` type doesn't have a default value because it may not be instantiated.")
+
+
+Null = _NullType()
+
+
+class _FunctionType(CallableTypeProtocol):
     def __init__(self, parameters: list[TypeProtocol], returns: TypeProtocol):
         self.parameters = parameters
         self.returns = returns
-
-    def get_type(self) -> "TypeProtocol":
-        return _TypeType()
+        self.runtime_type = Type
 
     def assignable_from(self, source: "TypeProtocol") -> bool:
         if not isinstance(source, CallableTypeProtocol):
@@ -133,9 +172,7 @@ class _Object(ObjectProtocol):
             raise TypeError(f"'type' must be a valid object type")
         self._type = type or self
         self._data = [field.type.default() for field in type.fields] if type is not None else []
-
-    def get_type(self) -> "_ObjectType":
-        return self._type
+        self.runtime_type = self._type
 
     @property
     def data(self):
@@ -234,10 +271,10 @@ class _ObjectType(_Object, ClassProtocol):
     _items: dict[str, _Field | _Method]
 
     def __init__(self, metaclass: Optional["_ObjectType"] = None):
-        super().__init__(metaclass or self.Instance)
         if self.Instance is None:
             self.Instance = self
         self._fields = []
+        super().__init__(metaclass or self.Instance)
         self._methods = []
         self._items = {}
 
@@ -249,7 +286,7 @@ class _ObjectType(_Object, ClassProtocol):
 
     def add_method(self, name: str, method):
         self._items[name] = method
-        self._methods.extend(method.overloads)
+        self._methods.extend(getattr(method, "overloads", [method]))
 
     def get_base(self) -> ClassProtocol | None:
         return None
@@ -299,6 +336,9 @@ class _ObjectType(_Object, ClassProtocol):
         return self._methods.copy()
 
 
+Object = _ObjectType()  # the 'object' type
+
+
 class _NullableType(TypeProtocol):
     _type: _ObjectType
 
@@ -306,9 +346,7 @@ class _NullableType(TypeProtocol):
         if not isinstance(type, _ObjectType):
             raise TypeError("Nullables may only be used with class types")
         self._type = type
-
-    def get_type(self) -> "TypeProtocol":
-        return _TypeType()
+        self.runtime_type = _TypeType()
 
     def assignable_from(self, source: "TypeProtocol") -> bool:
         if source is self:
@@ -319,32 +357,6 @@ class _NullableType(TypeProtocol):
     @classmethod
     def default(cls) -> ObjectProtocol:
         return _NullType.Instance
-
-
-_ObjectType()  # the 'object' type
-
-
-class _NullType(_ObjectType, metaclass=SingletonMeta):
-    """
-    The type of the `null` value. This value is places in the bottom of the inheritance tree and can
-    be case to all object types.
-    """
-
-    class _Null(ObjectProtocol):
-        def __init__(self):
-            super().__init__()
-
-        def get_type(self) -> "TypeProtocol":
-            return _NullType()
-
-    Instance = _Null()
-
-    def get_type(self) -> "TypeProtocol":
-        return _TypeType()
-
-    @classmethod
-    def default(cls) -> ObjectProtocol:
-        raise TypeError(f"`null` type doesn't have a default value because it may not be instantiated.")
 
 
 class _TypeClass(_ObjectType):
@@ -379,9 +391,9 @@ class _TypeClass(_ObjectType):
 
     def get_name(self, instance: ObjectProtocol | None, name: str):
         try:
-            return self._implementations[instance.get_type()].implementation.get_name(instance, name)
+            return self._implementations[instance.runtime_type].implementation.get_name(instance, name)
         except KeyError:
-            raise TypeError(f"type {instance.get_type()} does not implement type class '{self}'")
+            raise TypeError(f"type {instance.runtime_type} does not implement type class '{self}'")
 
     def add_implementation(self, type: TypeProtocol, implementation: _ObjectType):
         if type in self._implementations:

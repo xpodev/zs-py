@@ -429,13 +429,13 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             return self.state.error(f"You must either specify a type or a value in a `var` statement", var)
 
         if var_type is None:
-            var_type = initializer.get_type()
+            var_type = initializer.runtime_type
         elif not isinstance(var_type, TypeProtocol):
             return self.state.error(f"'var' statement type must be a valid Z# type")
         elif initializer is None:
             initializer = var_type.default()
 
-        if var_type is not None and not initializer.get_type().assignable_to(var_type):
+        if var_type is not None and not initializer.runtime_type.assignable_to(var_type):
             return self.state.error(f"Initializer expression does not match the variable type", var)
 
         name = var.name.name.name
@@ -522,7 +522,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         return function.call(arguments)
 
     def do_get_member(self, obj_srf, obj: ObjectProtocol, name: str):
-        member = obj_srf.get_type().get_name(obj, name)
+        member = obj_srf.runtime_type.get_name(obj, name)
         if self._srf_access:
             return member
         if isinstance(member, GetterProtocol):
