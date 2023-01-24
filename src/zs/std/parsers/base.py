@@ -149,7 +149,7 @@ def parse_typed_name(parser: Parser) -> TypedName:
 
     if parser.token(':'):
         _colon = parser.eat(':')
-        type_ = parser.next("Expression")
+        type_ = parser.next("Expression", 70)
     else:
         _colon = type_ = None
 

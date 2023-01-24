@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Callable
 
 from zs.cli.options import Options, get_options
-from zs.ctrt.core import _Object, _AnyType
-from zs.ctrt.native import NativeObject, NativeFunction
+from zs.ctrt.core import _Object, _AnyType, _VoidType, _UnitType, _TypeType
+from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
 from zs.ctrt.objects import Core, Scope
 from zs.ctrt.protocols import ObjectProtocol
 from zs.processing import State, StatefulProcessor
@@ -93,7 +93,19 @@ def main(options: Options):
         if callable(item):
             setattr(builtins, name, NativeFunction(item))
 
-    compiler.toolchain.interpreter.x.global_scope.refer("Python", builtins)
+    global_scope = compiler.toolchain.interpreter.x.global_scope
+
+    global_scope.refer("Python", builtins)
+
+    global_scope.refer("void", _VoidType())
+    global_scope.refer("unit", _UnitType())
+    global_scope.refer("any", _AnyType())
+    global_scope.refer("type", _TypeType())
+
+    global_scope.refer("bool", Boolean)
+    global_scope.refer("string", String)
+    global_scope.refer("i64", Int64)
+    global_scope.refer("f64", Float64)
 
     # def _assign(left, right):
     #     if isinstance(left, Field):
