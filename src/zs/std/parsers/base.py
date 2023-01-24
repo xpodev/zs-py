@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 
 from zs.ast.node import Node
 from zs.ast.node_lib import Function, Class, If, Expression, Binary, ExpressionStatement, Identifier, Literal, Module, Import, Alias, TypedName, FunctionCall, MemberAccess, Block, Return, While, \
-    Continue, Break, When, Var, TypeClass, TypeClassImplementation
+    Continue, Break, When, Var, TypeClass, TypeClassImplementation, Assign
 from zs.processing import State
 from zs.std.parsers.misc import subparser, copy_with
 from zs.text.errors import ParseError
@@ -613,6 +613,8 @@ class ExpressionParser(ContextualParser[Expression]):
         self.add_parser(copy_with(parse_function, binding_power=0))
         self.add_parser(copy_with(parse_class, binding_power=0))
         self.add_parser(copy_with(parse_type_class, binding_power=0))
+
+        self.add_parser(SubParser.infix_r(5, '=', self.parse, Assign))
 
         # terminal symbols
 

@@ -155,9 +155,11 @@ print(class {});
 print(fun(){});
 print(typeclass X { fun do(); });
 
-fun foo(fn) { fn("foo!"); }
-fun bar(x) { print("bar prints:"); print(x); }
+fun foo() { print("foo!"); }
+fun bar() { print("bar!"); }
 
 var fn = foo;
-fn(bar);
+fn();
+fn = bar;
+fn();
 
