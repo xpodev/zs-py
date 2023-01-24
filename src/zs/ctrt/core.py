@@ -21,6 +21,9 @@ class _TypeType(TypeProtocol, metaclass=SingletonMeta):
     def default(cls) -> ObjectProtocol:
         return cls()
 
+    def __str__(self):
+        return "type"
+
 
 Type = _TypeType()
 
@@ -43,6 +46,9 @@ class _VoidType(TypeProtocol, metaclass=SingletonMeta):
     def default(cls) -> ObjectProtocol:
         raise TypeError(f"`void` doesn't have a default value because it can't be instantiated")
 
+    def __str__(self):
+        return "void"
+
 
 Void = _VoidType()
 
@@ -55,6 +61,9 @@ class _UnitType(TypeProtocol, metaclass=SingletonMeta):
     class _Unit(ObjectProtocol, metaclass=SingletonMeta):
         def __init__(self, unit_type: "_UnitType"):
             self.runtime_type = unit_type
+
+        def __str__(self):
+            return "()"
 
     Instance = None
 
@@ -69,6 +78,9 @@ class _UnitType(TypeProtocol, metaclass=SingletonMeta):
     @classmethod
     def default(cls) -> ObjectProtocol:
         return cls.Instance
+
+    def __str__(self):
+        return "unit"
 
 
 Unit = _UnitType()
@@ -92,6 +104,9 @@ class _AnyType(TypeProtocol, metaclass=SingletonMeta):
     def default(cls) -> ObjectProtocol:
         raise TypeError(f"`any` doesn't have a default value because it is an abstract type.")
 
+    def __str__(self):
+        return "any"
+
 
 Any = _AnyType()
 
@@ -107,6 +122,9 @@ class _NullType(TypeProtocol, metaclass=SingletonMeta):
             super().__init__()
             self.runtime_type = null_type
 
+        def __str__(self):
+            return "null"
+
     Instance: _Null = None
 
     def __init__(self):
@@ -118,6 +136,9 @@ class _NullType(TypeProtocol, metaclass=SingletonMeta):
     @classmethod
     def default(cls) -> ObjectProtocol:
         raise TypeError(f"`null` type doesn't have a default value because it may not be instantiated.")
+
+    def __str__(self):
+        return "nulltype"
 
 
 Null = _NullType()
