@@ -268,7 +268,15 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         func = Function(return_type, self.x.current_scope)
 
-        func.name = function.name.name if function.name else None
+        if function.name is not None:
+            if isinstance(function.name, nodes.Identifier):
+                func.name = function.name.name
+            elif isinstance(function.name, nodes.Literal):
+                func.name = function.name.token_info.literal.value
+            else:
+                raise TypeError
+        else:
+            func.name = None
 
         if func.name:
             self.x.current_scope.define(func.name, func)
