@@ -617,6 +617,11 @@ class ExpressionParser(ContextualParser[Expression]):
         self.add_parser(SubParser.infix_r(5, '=', self.parse, Assign))
 
         self.add_parser(SubParser.infix_l(50, '+', self.parse))
+        self.add_parser(SubParser.infix_l(50, '-', self.parse))
+
+        self.add_parser(SubParser.infix_l(50, '*', self.parse))
+        self.add_parser(SubParser.infix_l(50, '/', self.parse))
+        self.add_parser(SubParser.infix_l(50, '%', self.parse))
 
         # terminal symbols
 
