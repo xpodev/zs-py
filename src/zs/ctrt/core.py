@@ -60,7 +60,7 @@ class _UnitType(TypeProtocol, metaclass=SingletonMeta):
 
     def __init__(self):
         if self.Instance is None:
-            self.Instance = self._Unit(self)
+            _UnitType.Instance = self._Unit(self)
         self.runtime_type = Type
 
     def assignable_from(self, source: "TypeProtocol") -> bool:
