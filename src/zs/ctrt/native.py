@@ -250,12 +250,22 @@ class Int64(NativeValue[int]):
         def default(cls):
             return Int64(0)
 
+        @native_fn("_+_")
+        @staticmethod
+        def add(left: "Int64", right: "Int64"):
+            return Int64(left.native + right.native)
+
 
 class Float64(NativeValue[float]):
     class Type(_Type):
         @classmethod
         def default(cls):
             return Float64(0.0)
+
+        @native_fn("_+_")
+        @staticmethod
+        def add(left: "Float64", right: "Float64"):
+            return Float64(left.native + right.native)
 
 
 class Boolean(NativeValue[bool]):
