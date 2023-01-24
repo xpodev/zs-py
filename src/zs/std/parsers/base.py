@@ -620,6 +620,7 @@ class ExpressionParser(ContextualParser[Expression]):
 
         # terminal symbols
 
+        self.symbol(',')
         self.symbol(')')
         self.symbol(';')
         self.symbol('{')

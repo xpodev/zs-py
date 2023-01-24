@@ -166,4 +166,6 @@ fn();
 var y = "Hello, " + "World!";
 print(y);
 
-var z: i64 = 0;
+var z: i64;
+
+print("z + 5 =", z + 5);
