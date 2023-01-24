@@ -186,3 +186,6 @@ class Number {
 }
 
 print(Number(2) + 3);
+print(bool);
+print(void);
+print(unit);
