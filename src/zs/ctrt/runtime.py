@@ -273,12 +273,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     @_exec
     def _(self, identifier: nodes.Identifier):
         try:
-            item = self.x.current_scope.get_name(None, identifier.name)
-            if self._srf_access:
-                return item
-            if isinstance(item, GetterProtocol):
-                return item.get()
-            return item
+            return self.do_resolve_name(identifier.name)
         except NameNotFoundError:
             return self.state.error(f"Could not resolve name '{identifier.name}'", identifier)
 
@@ -337,12 +332,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         with self.srf_access():
             obj_srf = self.execute(member_access.object)
         obj = self.execute(member_access.object)
-        member = obj_srf.get_type().get_name(obj, member_access.member.name)
-        if self._srf_access:
-            return member
-        if isinstance(member, GetterProtocol):
-            return member.get()
-        return member
+        return self.do_get_member(obj_srf, obj, member_access.member.name)
 
     @_exec
     def _(self, module: nodes.Module):
@@ -518,3 +508,19 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             raise TypeError(f"'function' must implement the callable protocol")
 
         return function.call(arguments)
+
+    def do_get_member(self, obj_srf, obj: ObjectProtocol, name: str):
+        member = obj_srf.get_type().get_name(obj, name)
+        if self._srf_access:
+            return member
+        if isinstance(member, GetterProtocol):
+            return member.get()
+        return member
+
+    def do_resolve_name(self, name: str):
+        item = self.x.current_scope.get_name(None, name)
+        if self._srf_access:
+            return item
+        if isinstance(item, GetterProtocol):
+            return item.get()
+        return item
