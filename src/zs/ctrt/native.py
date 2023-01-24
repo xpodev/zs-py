@@ -251,7 +251,6 @@ def native_fn(name: str = None):
     def wrapper(fn):
         if not callable(fn):
             raise TypeError
-
         return NativeFunction(fn, name)
 
     return wrapper
@@ -266,16 +265,18 @@ class String(NativeValue[str]):
         return cls("")
 
     @native_fn("_+_")
-    @staticmethod
-    def add(left: "String", right: "String"):
-        return String(left.native + right.native)
+    def __add__(self: "String", right: "String"):
+        return String(self.native + right.native)
+
+    @native_fn("length")
+    def __len__(self):
+        return Int64(len(self.native))
 
 
 class Int64(NativeValue[int]):
     @native_fn("_+_")
-    @staticmethod
-    def add(left: "Int64", right: "Int64"):
-        return Int64(left.native + right.native)
+    def __add__(self: "Int64", right: "Int64"):
+        return Int64(self.native + right.native)
 
     @classmethod
     def default(cls):
@@ -288,9 +289,8 @@ class Float64(NativeValue[float]):
         return cls(0.0)
 
     @native_fn("_+_")
-    @staticmethod
-    def add(left: "Float64", right: "Float64"):
-        return Float64(left.native + right.native)
+    def __add__(self: "Float64", right: "Float64"):
+        return Float64(self.native + right.native)
 
 
 class Boolean(NativeValue[bool]):

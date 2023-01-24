@@ -207,7 +207,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             right_srf = self.execute(right)
 
         op_fn = self.do_get_member(left_srf, left, f"_{binary.token_info.operator.value}_")
-        return self.do_function_call(op_fn, [left, right])
+        return self.do_function_call(op_fn, [right])
 
     @_exec
     def _(self, block: nodes.Block):
