@@ -169,3 +169,18 @@ print(y);
 var z: i64;
 
 print("z + 5 =", z + 5);
+
+print(y.length());
+
+
+class One {
+    fun One() {
+
+    }
+
+    fun "_+_"(other) {
+        return other + 1;
+    }
+}
+
+print(One() + 3);
