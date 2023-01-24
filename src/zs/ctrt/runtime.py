@@ -198,6 +198,18 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             target.set(self.execute(assign.right))
 
     @_exec
+    def _(self, binary: nodes.Binary):
+        left = self.execute(binary.left)
+        right = self.execute(binary.right)
+
+        with self.srf_access():
+            left_srf = self.execute(left)
+            right_srf = self.execute(right)
+
+        op_fn = self.do_get_member(left_srf, left, f"_{binary.token_info.operator.value}_")
+        return self.do_function_call(op_fn, [left, right])
+
+    @_exec
     def _(self, block: nodes.Block):
         with self.x.scope():
 
