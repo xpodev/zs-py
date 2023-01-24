@@ -163,3 +163,5 @@ fn();
 fn = bar;
 fn();
 
+var y = "Hello, " + "World!";
+print(y);
