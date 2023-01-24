@@ -297,7 +297,7 @@ class _ObjectType(_Object, ClassProtocol):
         try:
             member = self._items[name]
             if isinstance(member, BindProtocol):
-                return member.bind([instance or self])
+                return member.bind([instance if instance is not None else self])
             return member
         except KeyError:
             raise UnknownMemberError(f"Type '{self}' does not define member '{name}'")
