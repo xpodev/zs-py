@@ -55,7 +55,7 @@ class Toolchain(StatefulProcessor):
         path = path.resolve()
         self._document = info = DocumentInfo(path)
 
-        if (scope := self._context.get_scope_from_cached(info.path_string)) is None:
+        if (export_scope := self._context.get_scope_from_cached(info.path_string)) is None:
 
             file = SourceFile.from_path(path)
 
@@ -67,8 +67,7 @@ class Toolchain(StatefulProcessor):
 
             with self.interpreter.new_context():
 
-                # document frame
-                with self.interpreter.x.scope() as scope:
+                with self.interpreter.x.scope() as export_scope, self.interpreter.x.scope():
 
                     self.interpreter.run()
 
@@ -85,6 +84,6 @@ class Toolchain(StatefulProcessor):
                         print(50 * '-')
                         raise e
 
-                self._context.add_scope_to_cache(info.path_string, scope)
+                self._context.add_scope_to_cache(info.path_string, export_scope)
 
-        return scope
+        return export_scope

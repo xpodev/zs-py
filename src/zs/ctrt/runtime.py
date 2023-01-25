@@ -25,7 +25,7 @@ def _get_dict_from_import_result(node: nodes.Import, result: ImportResult):
         case nodes.Identifier() as star:
             if star.name != '*':
                 errors.append(f"Can't perform a default import since that is not a feature yet")
-            for name, item in result.all():
+            for name, item in result.all_items():
                 res[name] = item
         case nodes.Alias() as alias:
             errors.append(f"Can't perform a default import since that is not a feature yet")
@@ -212,7 +212,6 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     @_exec
     def _(self, block: nodes.Block):
         with self.x.scope():
-
             for statement in block.statements:
                 self.execute(statement)
 
@@ -227,6 +226,47 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         loop = self.execute(continue_.loop) if continue_.loop else None
 
         raise ContinueInstructionInvoked(loop)
+
+    @_exec
+    def _(self, export: nodes.Export):
+        target_scope = self.x.current_scope.parent
+        if export.source is not None:
+            source = self.execute(export.source)
+
+            if not isinstance(source, ImportResult):
+                raise TypeError
+
+            if isinstance(export.exported_names, nodes.Identifier):
+                if export.exported_names.name == "*":
+                    for name, item in source.all_items():
+                        target_scope.refer(name, item)
+                else:
+                    raise ValueError
+            elif isinstance(export.exported_names, list):
+                for item in export.exported_names:
+                    if isinstance(item, nodes.Identifier):
+                        target_scope.refer(item.name, source.item(item.name))
+                    elif isinstance(item, nodes.Alias):
+                        if not isinstance(item.expression, nodes.Identifier):
+                            raise TypeError
+                        target_scope.refer(item.name.name, item.expression.name)
+                    else:
+                        raise TypeError
+            else:
+                raise TypeError
+        else:
+            if isinstance(export.exported_names, nodes.Alias):
+                name = export.exported_names.name.name
+                exported_item = self.execute(export.exported_names.expression)
+            elif isinstance(export.exported_names, nodes.Identifier):
+                name = export.exported_names.name
+                exported_item = self.execute(export.exported_names)
+            else:
+                exported_item = self.execute(export.exported_names)
+                name = getattr(exported_item, "name", None)
+                if not name:
+                    raise ValueError
+            target_scope.define(name, exported_item)
 
     @_exec
     def _(self, expression_statement: nodes.ExpressionStatement):
@@ -448,7 +488,10 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             return self.state.error(f"Initializer expression does not match the variable type", var)
 
         name = var.name.name.name
-        self.x.current_scope.define(name, Variable(name, var_type, initializer))
+        variable = Variable(name, var_type, initializer)
+        self.x.current_scope.define(name, variable)
+
+        return variable
 
     @_exec
     def _(self, when: nodes.When):

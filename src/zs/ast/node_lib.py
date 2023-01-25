@@ -124,6 +124,25 @@ class Continue(Node[token_info.Continue]):
         self.loop = loop
 
 
+class Export(Node[token_info.Export]):
+    exported_names: "list[Identifier | Alias] | Alias | Expression | Import"
+    source: Expression | None
+
+    def __init__(
+            self,
+            _export: Token,
+            _l_curly: Token | None,
+            exported_names: "list[Identifier | Alias] | Alias | Expression | Import",
+            _r_curly: Token | None,
+            _from: Token | None,
+            source: Expression | None,
+            _semicolon: Token
+    ):
+        super().__init__(token_info.Export(_export, _l_curly, _r_curly, _from, _semicolon))
+        self.exported_names = exported_names
+        self.source = source
+
+
 class ExpressionStatement(Node[token_info.ExpressionStatement]):
     expression: Expression
 

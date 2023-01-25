@@ -8,7 +8,6 @@ from zs.cli.options import Options, get_options
 from zs.ctrt.core import _Object, _AnyType, _VoidType, _UnitType, _TypeType
 from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
 from zs.ctrt.objects import Core, Scope
-from zs.ctrt.protocols import ObjectProtocol
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter
 from zs.std.objects.compilation_environment import ContextManager
@@ -17,17 +16,16 @@ from zs.std.processing.import_system import ImportResult
 from zs.std.processing.toolchain import Toolchain
 
 
-class Builtins(ImportResult, NativeObject):
+class Builtins(NativeObject, ImportResult):
     def __init__(self):
         super().__init__()
-        NativeObject.__init__(self)
 
     @property
     def owner(self):
         return Core
 
-    def all(self):
-        return vars(self)
+    def all_items(self):
+        return self._items.items()
 
     def item(self, name: str):
         return getattr(self, name)

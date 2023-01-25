@@ -137,7 +137,7 @@ var x = "X is a variable!";
 print(x);
 
 
-class Foo {
+export class Foo {
     fun Foo() {}
 
     fun baz() {
