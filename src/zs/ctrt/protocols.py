@@ -11,12 +11,10 @@ class ObjectProtocol:
 
     Z# objects only hold data (i.e. other objects). How this data is stored is not part of the standard.
 
-    The only thing an object has to have is the `get_type()` function, which should return an object that
-    implements the `TypeProtocol` protocol.
+    The only thing an object has to have is a `runtime_type` attribute, which should hold the exact type
+    of the object.
     """
     runtime_type: "TypeProtocol"
-
-    # def get_type(self) -> "TypeProtocol": ...
 
 
 class TypeProtocol(ObjectProtocol):
