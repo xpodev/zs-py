@@ -5,8 +5,18 @@ from zs.ctrt import get_runtime
 from zs.ctrt.core import _Object, _ObjectType, _TypeClass, _FunctionType, _TypeType
 from zs.ctrt.errors import NameNotFoundError, NameAlreadyExistsError, NoParentScopeError, UnknownMemberError, ReturnInstructionInvoked
 from zs.ctrt.native import NativeObject
-from zs.ctrt.protocols import TypeProtocol, ObjectProtocol, ClassProtocol, MutableClassProtocol, SetterProtocol, GetterProtocol, ScopeProtocol, BindProtocol, \
-    CallableProtocol, CallableTypeProtocol
+from zs.ctrt.protocols import (
+    BindProtocol,
+    CallableProtocol,
+    CallableTypeProtocol,
+    ClassProtocol,
+    GetterProtocol,
+    MutableClassProtocol,
+    ObjectProtocol,
+    ScopeProtocol,
+    SetterProtocol,
+    TypeProtocol,
+)
 
 
 class Parameter:
@@ -152,24 +162,6 @@ class Function(NativeObject, CallableProtocol):
             self._parameters.insert(index, parameter)
         self.runtime_type = _FunctionType(self.get_parameter_types(), self._return_type)
         return parameter
-
-
-# class Method(Function):
-#     owner: "Class"
-#     _static: bool
-#
-#     def __init__(self, owner: "Class", lexical_scope: "Scope", is_static: bool = False):
-#         super().__init__(lexical_scope)
-#         self.owner = owner
-#         self._static = is_static
-#
-#     @property
-#     def is_static(self):
-#         return self._static
-#
-#     @is_static.setter
-#     def is_static(self, value):
-#         self._static = value
 
 
 class FunctionGroup(NativeObject, BindProtocol):
