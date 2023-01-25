@@ -48,6 +48,7 @@ class TypeProtocol(ObjectProtocol):
         """
         The default value of the type, or raise `TypeError` if the type doesn't have a default value.
         """
+        raise TypeError(f"type {cls} does not have a default value")
 
 
 class GetterProtocol:
