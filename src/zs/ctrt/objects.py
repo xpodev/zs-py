@@ -154,24 +154,6 @@ class Function(NativeObject, CallableProtocol):
         return parameter
 
 
-# class Method(Function):
-#     owner: "Class"
-#     _static: bool
-#
-#     def __init__(self, owner: "Class", lexical_scope: "Scope", is_static: bool = False):
-#         super().__init__(lexical_scope)
-#         self.owner = owner
-#         self._static = is_static
-#
-#     @property
-#     def is_static(self):
-#         return self._static
-#
-#     @is_static.setter
-#     def is_static(self, value):
-#         self._static = value
-
-
 class FunctionGroup(NativeObject, BindProtocol):
     name: str
     _overloads: list[Function]
