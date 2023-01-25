@@ -5,8 +5,18 @@ from zs.ctrt import get_runtime
 from zs.ctrt.core import _Object, _ObjectType, _TypeClass, _FunctionType, _TypeType
 from zs.ctrt.errors import NameNotFoundError, NameAlreadyExistsError, NoParentScopeError, UnknownMemberError, ReturnInstructionInvoked
 from zs.ctrt.native import NativeObject
-from zs.ctrt.protocols import TypeProtocol, ObjectProtocol, ClassProtocol, MutableClassProtocol, SetterProtocol, GetterProtocol, ScopeProtocol, BindProtocol, \
-    CallableProtocol, CallableTypeProtocol
+from zs.ctrt.protocols import (
+    BindProtocol,
+    CallableProtocol,
+    CallableTypeProtocol,
+    ClassProtocol,
+    GetterProtocol,
+    MutableClassProtocol,
+    ObjectProtocol,
+    ScopeProtocol,
+    SetterProtocol,
+    TypeProtocol,
+)
 
 
 class Parameter:
