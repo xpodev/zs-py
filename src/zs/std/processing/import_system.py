@@ -5,7 +5,7 @@ from zs.ctrt.protocols import ObjectProtocol
 
 
 class ImportResult:
-    def all(self) -> Iterable[tuple[str, ObjectProtocol]]:
+    def all_items(self) -> Iterable[tuple[str, ObjectProtocol]]:
         ...
 
     def item(self, name: str) -> ObjectProtocol:

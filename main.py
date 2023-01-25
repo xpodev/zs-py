@@ -26,8 +26,8 @@ class Builtins(ImportResult, NativeObject):
     def owner(self):
         return Core
 
-    def all(self):
-        return vars(self)
+    def all_items(self):
+        return self._items.items()
 
     def item(self, name: str):
         return getattr(self, name)
