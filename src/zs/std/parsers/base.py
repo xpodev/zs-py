@@ -123,6 +123,21 @@ def _many(fn: Callable[[Parser], _T]) -> Callable[[Parser], list[_T]]:
     return wrapper
 
 
+def _chain(*args: Callable[[Parser], _T]) -> Callable[[Parser], _T]:
+    @_with_default
+    def wrapper(parser: Parser):
+        return [arg(parser) for arg in args]
+
+    return wrapper
+
+
+def _map(parser_fn: Callable[[Parser], _T], fn: Callable[[_T], _U]) -> Callable[[Parser], _U]:
+    @_with_default
+    def wrapper(parser: Parser):
+        return fn(parser_fn(parser))
+
+    return wrapper
+
 # parsers
 
 
