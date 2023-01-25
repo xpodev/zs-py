@@ -206,9 +206,9 @@ def parse_import(parser: Parser) -> Import:
         imported_names: list[Identifier | Alias] | Identifier | Alias = []
 
     _l_curly = _r_curly = None
-    if parser.token("{"):
-        _l_curly = parser.eat("{")
-        while True:
+    if parser.token('{'):
+        _l_curly = parser.eat('{')
+        while not parser.token('}'):
             name = _identifier(parser)
 
             if parser.token("as"):
@@ -216,18 +216,18 @@ def parse_import(parser: Parser) -> Import:
 
             imported_names.append(name)
 
-            if not parser.token("}"):
-                parser.eat(",")
+            if not parser.token('}'):
+                parser.eat(',')
             else:
                 break
-        _r_curly = parser.eat("}")
+        _r_curly = parser.eat('}')
 
     _from = parser.eat("from")
 
     source = parser.next("Expression")
 
     return Import(
-        keyword, _l_curly, imported_names, _r_curly, _from, source, parser.eat(";")
+        keyword, _l_curly, imported_names, _r_curly, _from, source, parser.eat(';')
     )
 
 
