@@ -4,9 +4,9 @@ from pathlib import Path
 
 from zs.ast.node import Node
 from zs.ast import node_lib as nodes
-from zs.ctrt.core import _NullType, _UnitType, _AnyType
+from zs.ctrt.core import _NullType, _UnitType, _AnyType, Null
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
-from zs.ctrt.objects import Frame, Function, Scope, NativeFunction, Class, FunctionGroup, Variable, TypeClass, Argument, TypeClassImplementation
+from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
 from zs.processing import StatefulProcessor, State
 from zs.std.processing.import_system import ImportSystem, ImportResult
 from zs.text.token import TokenType
@@ -166,12 +166,12 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             self._x = context
 
     @contextmanager
-    def srf_access(self):
-        self._srf_access = True
+    def srf_access(self, srf=True):
+        self._srf_access, old = srf, self._srf_access
         try:
             yield
         finally:
-            self._srf_access = False
+            self._srf_access = old
 
     def execute(self, node: Node):
         return self._execute(node)
@@ -192,15 +192,26 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         with self.srf_access():
             target = self.execute(assign.left)
 
-            if not isinstance(target, SetterProtocol):
-                self.state.error(f"Could not assign to '{assign.left}' because it does not implement the setter protocol", assign)
+        if not isinstance(target, SetterProtocol):
+            self.state.error(f"Could not assign to '{assign.left}' because it does not implement the setter protocol", assign)
 
-            target.set(self.execute(assign.right))
+        target.set(self.execute(assign.right))
+
+    @_exec
+    def _(self, binary: nodes.Binary):
+        left = self.execute(binary.left)
+        right = self.execute(binary.right)
+
+        with self.srf_access():
+            left_srf = self.execute(left)
+            right_srf = self.execute(right)
+
+        op_fn = self.do_get_member(left_srf, left, f"_{binary.token_info.operator.value}_")
+        return self.do_function_call(op_fn, [right])
 
     @_exec
     def _(self, block: nodes.Block):
         with self.x.scope():
-
             for statement in block.statements:
                 self.execute(statement)
 
@@ -215,6 +226,47 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         loop = self.execute(continue_.loop) if continue_.loop else None
 
         raise ContinueInstructionInvoked(loop)
+
+    @_exec
+    def _(self, export: nodes.Export):
+        target_scope = self.x.current_scope.parent
+        if export.source is not None:
+            source = self.execute(export.source)
+
+            if not isinstance(source, ImportResult):
+                raise TypeError
+
+            if isinstance(export.exported_names, nodes.Identifier):
+                if export.exported_names.name == "*":
+                    for name, item in source.all():
+                        target_scope.refer(name, item)
+                else:
+                    raise ValueError
+            elif isinstance(export.exported_names, list):
+                for item in export.exported_names:
+                    if isinstance(item, nodes.Identifier):
+                        target_scope.refer(item.name, source.item(item.name))
+                    elif isinstance(item, nodes.Alias):
+                        if not isinstance(item.expression, nodes.Identifier):
+                            raise TypeError
+                        target_scope.refer(item.name.name, item.expression.name)
+                    else:
+                        raise TypeError
+            else:
+                raise TypeError
+        else:
+            if isinstance(export.exported_names, nodes.Alias):
+                name = export.exported_names.name.name
+                exported_item = self.execute(export.exported_names.expression)
+            elif isinstance(export.exported_names, nodes.Identifier):
+                name = export.exported_names.name
+                exported_item = self.execute(export.exported_names)
+            else:
+                exported_item = self.execute(export.exported_names)
+                name = getattr(exported_item, "name", None)
+                if not name:
+                    raise ValueError
+            target_scope.define(name, exported_item)
 
     @_exec
     def _(self, expression_statement: nodes.ExpressionStatement):
@@ -256,7 +308,15 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         func = Function(return_type, self.x.current_scope)
 
-        func.name = function.name.name if function.name else None
+        if function.name is not None:
+            if isinstance(function.name, nodes.Identifier):
+                func.name = function.name.name
+            elif isinstance(function.name, nodes.Literal):
+                func.name = function.name.token_info.literal.value
+            else:
+                raise TypeError
+        else:
+            func.name = None
 
         if func.name:
             self.x.current_scope.define(func.name, func)
@@ -273,12 +333,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     @_exec
     def _(self, identifier: nodes.Identifier):
         try:
-            item = self.x.current_scope.get_name(None, identifier.name)
-            if self._srf_access:
-                return item
-            if isinstance(item, GetterProtocol):
-                return item.get()
-            return item
+            return self.do_resolve_name(identifier.name)
         except NameNotFoundError:
             return self.state.error(f"Could not resolve name '{identifier.name}'", identifier)
 
@@ -317,11 +372,11 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     def _(self, literal: nodes.Literal):
         value = literal.token_info.literal.value
         if value == "true":
-            return Boolean(True)
+            return Boolean.TRUE
         if value == "false":
-            return Boolean(False)
+            return Boolean.FALSE
         if value == "null":
-            return _NullType.Instance
+            return Null.Instance
         match literal.token_info.literal.type:
             case TokenType.String:
                 return String(value)
@@ -336,13 +391,9 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     def _(self, member_access: nodes.MemberAccess):
         with self.srf_access():
             obj_srf = self.execute(member_access.object)
-        obj = self.execute(member_access.object)
-        member = obj_srf.get_type().get_name(obj, member_access.member.name)
-        if self._srf_access:
-            return member
-        if isinstance(member, GetterProtocol):
-            return member.get()
-        return member
+        with self.srf_access(False):
+            obj = self.execute(member_access.object)
+        return self.do_get_member(obj_srf, obj, member_access.member.name)
 
     @_exec
     def _(self, module: nodes.Module):
@@ -427,17 +478,20 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             return self.state.error(f"You must either specify a type or a value in a `var` statement", var)
 
         if var_type is None:
-            var_type = initializer.get_type()
+            var_type = initializer.runtime_type
         elif not isinstance(var_type, TypeProtocol):
             return self.state.error(f"'var' statement type must be a valid Z# type")
         elif initializer is None:
             initializer = var_type.default()
 
-        if var_type is not None and not initializer.get_type().assignable_to(var_type):
+        if var_type is not None and not initializer.runtime_type.assignable_to(var_type):
             return self.state.error(f"Initializer expression does not match the variable type", var)
 
         name = var.name.name.name
-        self.x.current_scope.define(name, Variable(name, var_type, initializer))
+        variable = Variable(name, var_type, initializer)
+        self.x.current_scope.define(name, variable)
+
+        return variable
 
     @_exec
     def _(self, when: nodes.When):
@@ -518,3 +572,19 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             raise TypeError(f"'function' must implement the callable protocol")
 
         return function.call(arguments)
+
+    def do_get_member(self, obj_srf, obj: ObjectProtocol, name: str):
+        member = obj_srf.runtime_type.get_name(obj, name)
+        if self._srf_access:
+            return member
+        if isinstance(member, GetterProtocol):
+            return member.get()
+        return member
+
+    def do_resolve_name(self, name: str):
+        item = self.x.current_scope.get_name(None, name)
+        if self._srf_access:
+            return item
+        if isinstance(item, GetterProtocol):
+            return item.get()
+        return item

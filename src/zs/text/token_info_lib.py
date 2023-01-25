@@ -103,6 +103,18 @@ class Continue(TokenInfo):
 
 
 @dataclass(**_cfg)
+class Export(TokenInfo):
+    keyword_export: Token
+
+    left_bracket: Token | None
+    right_bracket: Token | None
+
+    keyword_from: Token | None
+
+    semicolon: Token
+
+
+@dataclass(**_cfg)
 class ExpressionStatement(TokenInfo):
     """
     Token info for the expression statement node:

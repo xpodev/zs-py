@@ -5,10 +5,9 @@ from pathlib import Path
 from typing import Callable
 
 from zs.cli.options import Options, get_options
-from zs.ctrt.core import _Object, _AnyType
-from zs.ctrt.native import NativeObject
-from zs.ctrt.objects import NativeFunction, Core, Scope
-from zs.ctrt.protocols import ObjectProtocol
+from zs.ctrt.core import _AnyType, _VoidType, _UnitType, _TypeType
+from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
+from zs.ctrt.objects import Core, Scope
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter
 from zs.std.objects.compilation_environment import ContextManager
@@ -17,17 +16,20 @@ from zs.std.processing.import_system import ImportResult
 from zs.std.processing.toolchain import Toolchain
 
 
-class Builtins(ImportResult, NativeObject):
+class Builtins(NativeObject, ImportResult):
+    print = NativeFunction(print, "print")
+
     def __init__(self):
         super().__init__()
-        NativeObject.__init__(self)
 
     @property
     def owner(self):
         return Core
 
     def all(self):
-        return vars(self)
+        return {
+            "print": self.print
+        }.items()
 
     def item(self, name: str):
         return getattr(self, name)
@@ -88,13 +90,24 @@ def main(options: Options):
 
     builtins = compiler.builtins
 
-    for name in vars(__builtins__):
-        item = getattr(__builtins__, name)
-        if callable(item):
-            setattr(builtins, name, NativeFunction(item))
-    builtins.create_instance_of = NativeFunction(lambda typ: _Object(typ))
+    # for name in vars(__builtins__):
+    #     item = getattr(__builtins__, name)
+    #     if callable(item):
+    #         setattr(builtins, name, NativeFunction(item))
 
-    compiler.toolchain.interpreter.x.global_scope.refer("Python", builtins)
+    global_scope = compiler.toolchain.interpreter.x.global_scope
+
+    global_scope.refer("Python", builtins)
+
+    global_scope.refer("void", _VoidType())
+    global_scope.refer("unit", _UnitType())
+    global_scope.refer("any", _AnyType())
+    global_scope.refer("type", _TypeType())
+
+    global_scope.refer("bool", Boolean)
+    global_scope.refer("string", String)
+    global_scope.refer("i64", Int64)
+    global_scope.refer("f64", Float64)
 
     # def _assign(left, right):
     #     if isinstance(left, Field):

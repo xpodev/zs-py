@@ -7,11 +7,15 @@ fun print2(value) {
 }
 
 fun no_print() {
-    print("this should not print");
+    print("This should not be printed.");
 }
 
+var v1 = "blah";
 {
+    var v1 = "blah in a block";
     print("Block!");
+
+    print(v1);
 }
 
 if (true) {
@@ -133,7 +137,7 @@ var x = "X is a variable!";
 print(x);
 
 
-class Foo {
+export class Foo {
     fun Foo() {}
 
     fun baz() {
@@ -155,9 +159,37 @@ print(class {});
 print(fun(){});
 print(typeclass X { fun do(); });
 
-fun foo(fn) { fn("foo!"); }
-fun bar(x) { print("bar prints:"); print(x); }
+fun foo() { print("foo!"); }
+fun bar() { print("bar!"); }
 
 var fn = foo;
-fn(bar);
+fn();
+fn = bar;
+fn();
 
+var y = "Hello, " + "World!";
+print(y);
+
+var z: i64;
+
+print("z + 5 =", z + 5);
+
+print(y.length());
+
+
+class Number {
+    fun Number(x) {
+        this.x = x;
+    }
+
+    fun "_+_"(other) {
+        return Number(1 + other);
+    }
+
+    var x: i64;
+}
+
+print(Number(2) + 3);
+print(bool);
+print(void);
+print(unit);

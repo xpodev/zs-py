@@ -82,8 +82,8 @@ class SubParser:
         return lambda stream: Unary(stream.eat(token), expr_fn(stream, binding_power))
 
     @classmethod
-    def infix_l(cls, binding_power: int, token: str | TokenType, expr_fn: Callable[["Parser", int], Expression]):
-        return cls(binding_power, token, led=cls._infix_func(binding_power, token, expr_fn))
+    def infix_l(cls, binding_power: int, token: str | TokenType, expr_fn: Callable[["Parser", int], Expression], factory=Binary):
+        return cls(binding_power, token, led=cls._infix_func(binding_power, token, expr_fn, factory=factory))
 
     @classmethod
     def infix_r(cls, binding_power: int, token: str | TokenType, expr_fn: Callable[["Parser", int], Expression], factory=Binary):
