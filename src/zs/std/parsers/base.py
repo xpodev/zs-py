@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 
 from zs.ast.node import Node
 from zs.ast.node_lib import Function, Class, If, Expression, Binary, ExpressionStatement, Identifier, Literal, Module, Import, Alias, TypedName, FunctionCall, MemberAccess, Block, Return, While, \
-    Continue, Break, When, Var, TypeClass, TypeClassImplementation, Assign
+    Continue, Break, When, Var, TypeClass, TypeClassImplementation, Assign, Export
 from zs.processing import State
 from zs.std.parsers.misc import subparser, copy_with
 from zs.text.errors import ParseError
@@ -190,6 +190,60 @@ def parse_block(parser: Parser) -> Block:
 
 
 # statements
+
+
+@subparser("export")
+def parse_export(parser: Parser) -> Export:
+    keyword = parser.eat("export")
+
+    _l_curly = _r_curly = None
+
+    source = True
+    if parser.token('*'):
+        exported_items = Identifier(parser.eat('*'))
+        if parser.token("as"):
+            exported_items = Alias(exported_items, parser.eat("as"), _identifier(parser))
+    elif parser.token('{'):
+        exported_items: list[Identifier | Alias] | Identifier | Alias = []
+        _l_curly = parser.eat('{')
+        while not parser.token('}'):
+            name = _identifier(parser)
+
+            if parser.token("as"):
+                name = Alias(name, parser.eat("as"), _identifier(parser))
+
+            exported_items.append(name)
+
+            if not parser.token('}'):
+                parser.eat(',')
+            else:
+                break
+        _r_curly = parser.eat('}')
+    else:
+        exported_items = _one_of(
+            parse_var,
+            parse_function,
+            parse_class,
+            parse_module,
+            parse_type_class,
+            parse_import,
+            _map(_chain(_identifier, _eat(';')), lambda items: items[0])
+        )(parser)
+
+        if parser.token("as"):
+            exported_items = Alias(exported_items, parser.eat("as"), _identifier(parser))
+
+        source = None
+
+    _from = _semicolon = None
+    if source:
+        _from = parser.eat("from")
+
+        source = parser.next("Expression")
+
+        _semicolon = parser.eat(';')
+
+    return Export(keyword, _l_curly, exported_items, _r_curly, _from, source, _semicolon)
 
 
 @subparser("import")
@@ -742,6 +796,7 @@ def get_parser(state: State):
 
         parse_block,
 
+        parse_export,
         parse_import,
         parse_function,
         parse_class,
