@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 from zs.cli.options import Options, get_options
-from zs.ctrt.core import _Object, _AnyType, _VoidType, _UnitType, _TypeType
+from zs.ctrt.core import _AnyType, _VoidType, _UnitType, _TypeType
 from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
 from zs.ctrt.objects import Core, Scope
 from zs.processing import State, StatefulProcessor
@@ -17,6 +17,8 @@ from zs.std.processing.toolchain import Toolchain
 
 
 class Builtins(NativeObject, ImportResult):
+    print = NativeFunction(print, "print")
+
     def __init__(self):
         super().__init__()
 
@@ -24,8 +26,10 @@ class Builtins(NativeObject, ImportResult):
     def owner(self):
         return Core
 
-    def all_items(self):
-        return self._items.items()
+    def all(self):
+        return {
+            "print": self.print
+        }.items()
 
     def item(self, name: str):
         return getattr(self, name)
@@ -86,10 +90,10 @@ def main(options: Options):
 
     builtins = compiler.builtins
 
-    for name in vars(__builtins__):
-        item = getattr(__builtins__, name)
-        if callable(item):
-            setattr(builtins, name, NativeFunction(item))
+    # for name in vars(__builtins__):
+    #     item = getattr(__builtins__, name)
+    #     if callable(item):
+    #         setattr(builtins, name, NativeFunction(item))
 
     global_scope = compiler.toolchain.interpreter.x.global_scope
 

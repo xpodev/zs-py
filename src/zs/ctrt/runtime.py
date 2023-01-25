@@ -25,7 +25,7 @@ def _get_dict_from_import_result(node: nodes.Import, result: ImportResult):
         case nodes.Identifier() as star:
             if star.name != '*':
                 errors.append(f"Can't perform a default import since that is not a feature yet")
-            for name, item in result.all_items():
+            for name, item in result.all():
                 res[name] = item
         case nodes.Alias() as alias:
             errors.append(f"Can't perform a default import since that is not a feature yet")
@@ -238,7 +238,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
             if isinstance(export.exported_names, nodes.Identifier):
                 if export.exported_names.name == "*":
-                    for name, item in source.all_items():
+                    for name, item in source.all():
                         target_scope.refer(name, item)
                 else:
                     raise ValueError

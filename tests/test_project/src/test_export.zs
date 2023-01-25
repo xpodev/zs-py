@@ -1,4 +1,4 @@
-// export * as Python from Python;
+export * from Python;
 
 export { } from Python;
 

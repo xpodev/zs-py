@@ -15,7 +15,7 @@ class ZSImportResult(ImportResult):
         self._scope = scope
         self._items = dict(scope.members)
 
-    def all_items(self) -> Iterable[tuple[str, ObjectProtocol]]:
+    def all(self) -> Iterable[tuple[str, ObjectProtocol]]:
         for name, item in self._items.items():
             yield name, item
 
