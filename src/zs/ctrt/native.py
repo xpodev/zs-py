@@ -183,6 +183,20 @@ class NativeObject(_Object, metaclass=_NativeClassMeta):
             self._items[name] = value
         super().__setattr__(name, value)
 
+    def __getattr__(self, item):
+        try:
+            result = self.__getattribute__(item)
+        except AttributeError:
+            try:
+                result = self._items[item]
+            except KeyError:
+                raise AttributeError
+        if isinstance(result, BindProtocol):
+            result = result.bind([self])
+        if isinstance(result, GetterProtocol):
+            return result.get()
+        return result
+
 
 class NativeFunction(NativeObject, CallableProtocol, BindProtocol):
     name: str
