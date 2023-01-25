@@ -1,3 +1,7 @@
+""" core.py
+This module defines some core types in the Z# programming language.
+"""
+
 from typing import Optional
 
 from zs.ctrt.errors import FieldAlreadyDefinedError, MemberAlreadyDefinedError, UnknownMemberError, NameNotFoundError
