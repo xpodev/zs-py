@@ -4,9 +4,8 @@ This module defines some core types in the Z# programming language.
 
 from typing import Optional
 
-from zs.ctrt.errors import FieldAlreadyDefinedError, MemberAlreadyDefinedError, UnknownMemberError, NameNotFoundError
-from zs.ctrt.protocols import ClassProtocol, TypeProtocol, ObjectProtocol, SetterProtocol, GetterProtocol, BindProtocol, ScopeProtocol, _PartialCallImpl, CallableProtocol, \
-    DefaultCallableProtocol, CallableTypeProtocol
+from zs.ctrt.errors import MemberAlreadyDefinedError, UnknownMemberError
+from zs.ctrt.protocols import ClassProtocol, TypeProtocol, ObjectProtocol, SetterProtocol, GetterProtocol, BindProtocol, CallableTypeProtocol
 from zs.utils import SingletonMeta
 
 
