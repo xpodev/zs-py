@@ -43,3 +43,5 @@ fun Foo(x: type) {
 
 var f = FooCls();
 print(f);
+
+foo(FooCls);
