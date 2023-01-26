@@ -587,7 +587,7 @@ class Scope(ScopeProtocol):
             return self._items[key]
 
         def __setitem__(self, key: str, value: _T):
-            def _get_overload_group_parent(scope=self._owner.parent):
+            def _get_overload_group_parent(scope: Scope | None = self._owner.parent):
                 if scope is None:
                     return None
                 try:
