@@ -48,12 +48,11 @@ class TypeProtocol(ObjectProtocol):
         """
         return source is self
 
-    @classmethod
-    def default(cls) -> ObjectProtocol:
+    def default(self) -> ObjectProtocol:
         """
         The default value of the type, or raise `TypeError` if the type doesn't have a default value.
         """
-        raise TypeError(f"type {cls} does not have a default value")
+        raise TypeError(f"type {self} does not have a default value")
 
 
 class GetterProtocol:
@@ -90,7 +89,7 @@ class ImmutableScopeProtocol:
         """
 
 
-class DynamicScopeProtocol(ImmutableScopeProtocol):
+class DynamicScopeProtocol:
     """
     Represents a scope that can change size
     """
@@ -114,14 +113,7 @@ class DynamicScopeProtocol(ImmutableScopeProtocol):
         """
 
 
-class MutableScopeProtocol(ImmutableScopeProtocol):
-    def set_name(self, name: str, value: ObjectProtocol):
-        """
-        Set the value which the given `name` is bound to the given `value`.
-        """
-
-
-class ScopeProtocol(DynamicScopeProtocol, MutableScopeProtocol):
+class ScopeProtocol(DynamicScopeProtocol, ImmutableScopeProtocol):
     ...
 
 
@@ -133,11 +125,20 @@ class ImmutableTypeProtocol(TypeProtocol, ImmutableScopeProtocol):
     ...
 
 
-class MutableTypeProtocol(ImmutableTypeProtocol, MutableScopeProtocol):
+class MutableTypeProtocol(ImmutableTypeProtocol):
     ...
 
 
-class ClassProtocol(ConstructibleTypeProtocol):
+class CallableProtocol(ObjectProtocol):
+    runtime_type: "CallableTypeProtocol"
+
+    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+        """
+        Apply actual values to the object.
+        """
+
+
+class ClassProtocol(ConstructibleTypeProtocol, ScopeProtocol, CallableProtocol):
     def get_base(self) -> "ClassProtocol | None": ...
 
     def is_subclass_of(self, base: "ClassProtocol") -> bool:
@@ -154,12 +155,15 @@ class ClassProtocol(ConstructibleTypeProtocol):
     def is_superclass_of(self, child: "ClassProtocol") -> bool:
         return child.is_subclass_of(self)
 
+    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+        return self.create_instance(args)
 
-class ImmutableClassProtocol(ClassProtocol, ImmutableTypeProtocol):
+
+class ImmutableClassProtocol(ClassProtocol, ImmutableScopeProtocol):
     ...
 
 
-class MutableClassProtocol(ClassProtocol, MutableTypeProtocol):
+class MutableClassProtocol(ClassProtocol, ImmutableScopeProtocol):
     ...
 
 
@@ -167,15 +171,6 @@ class BindProtocol:
     def bind(self, args: list[ObjectProtocol]):
         """
         Returns an object that's bound to the given arguments.
-        """
-
-
-class CallableProtocol(ObjectProtocol):
-    runtime_type: "CallableTypeProtocol"
-
-    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
-        """
-        Apply actual values to the object.
         """
 
 
@@ -196,4 +191,15 @@ class CallableTypeProtocol(TypeProtocol):
         Returns the result type when called with the given types.
 
         :raises TypeError: if the types given do not match this callable's type.
+        """
+
+
+class DisposableProtocol:
+    """
+    Represents objects that need to take some actions once they are disposed of.
+    """
+
+    def dispose(self):
+        """
+        Dispose of this object. This method should be implemented in subclasses to do finalization code.
         """

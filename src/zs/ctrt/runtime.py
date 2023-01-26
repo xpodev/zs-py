@@ -4,14 +4,16 @@ from pathlib import Path
 
 from zs.ast.node import Node
 from zs.ast import node_lib as nodes
-from zs.ctrt.core import _NullType, _UnitType, _AnyType, Null
+from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
-from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
+# from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
+from zs.ctrt.objects import Frame, Scope
+from zs.ctrt.protocols import DynamicScopeProtocol, ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol
 from zs.processing import StatefulProcessor, State
 from zs.std.processing.import_system import ImportSystem, ImportResult
 from zs.text.token import TokenType
 
-from zs.ctrt.native import *
+# from zs.ctrt.native import *
 from zs.utils import SingletonMeta
 
 _GLOBAL_SCOPE = object()
@@ -52,7 +54,7 @@ class InterpreterState:
     _frame_stack: list[Frame]
     _scope: Scope
     _global_scope: Scope
-    _scope_protocol: ScopeProtocol | None
+    _scope_protocol: DynamicScopeProtocol | None
 
     def __init__(self, global_scope: Scope):
         self._frame_stack = [Frame(None, global_scope)]
@@ -72,7 +74,7 @@ class InterpreterState:
         return self._global_scope
 
     @contextmanager
-    def scope_protocol(self, scope_protocol: ScopeProtocol):
+    def scope_protocol(self, scope_protocol: DynamicScopeProtocol):
         self._scope_protocol, old = scope_protocol, self._scope_protocol
 
         try:
@@ -81,56 +83,26 @@ class InterpreterState:
             self._scope_protocol = old
 
     @contextmanager
-    def scope(self, scope: ScopeProtocol = None, /, parent: Scope = None, **items: ObjectProtocol):
+    def scope(self, scope: DynamicScopeProtocol = None, /, parent: Scope = None, **items: ObjectProtocol):
         self._scope, old = scope or Scope(parent or self._scope, **items), self._scope
         try:
             yield self._scope
         finally:
+            if isinstance(self._scope, DisposableProtocol):
+                self._scope.dispose()
             self._scope = old
 
     @contextmanager
-    def frame(self, function: Function):
+    def frame(self, function: "Function"):
         self._frame_stack.append(Frame(function, function.lexical_scope))
         self._scope, scope = self.current_frame, self._scope
         try:
             yield
         finally:
-            self._frame_stack.pop()
+            frame = self._frame_stack.pop()
+            if isinstance(frame, DisposableProtocol):
+                frame.dispose()
             self._scope = scope
-
-
-# class Runtime(StatefulProcessor, metaclass=SingletonMeta):
-#     _x: InterpreterState
-#
-#     def __init__(self, state: State, global_scope: Scope):
-#         super().__init__(state)
-#         self._x = InterpreterState(global_scope)
-#
-#     def do_function_call(self, function: Function | NativeFunction, args: list[ObjectProtocol]):
-#         """
-#         Executes a function call
-#
-#         :param function: The function to call. Must be a valid Z# function object or a native function object.
-#         :param args: The arguments to call the function with.
-#
-#         :returns: The result of the function call, or None if an error has occurred.
-#         """
-#
-#     def do_return(self, value: ObjectProtocol | None = None):
-#         """
-#         Execute a return command which will terminate the function.
-#
-#         :param value: The return value of the current executing function or `None`, if there's no return value (void).
-#         """
-#
-#     def do_resolve_name(self, name: str) -> ObjectProtocol | None:
-#         """
-#         Resolves a name in the current scope.
-#
-#         :param name: The name of the object to look for.
-#
-#         :returns: The object bound to the name closest to the current scope or `None` if no such object was found.
-#         """
 
 
 class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
@@ -280,15 +252,11 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         arguments = list(map(self.execute, call.arguments))
 
-        # native function support
-        if isinstance(group_or_function, NativeFunction):
-            return self.do_function_call(group_or_function, arguments)
-
         # did we successfully evaluate the arguments?
 
         # can we unpack the arguments into the function parameters without any errors? I guess we should try...
 
-        if isinstance(group_or_function, FunctionGroup):
+        if isinstance(group_or_function, OverloadGroup):
             overloads = group_or_function.get_matching_overloads(arguments)
 
             if len(overloads) > 1:
@@ -304,29 +272,32 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     @_exec
     def _(self, function: nodes.Function):
-        return_type = self.execute(function.return_type) if function.return_type is not None else _UnitType()
-
-        func = Function(return_type, self.x.current_scope)
+        return_type = self.execute(function.return_type) if function.return_type is not None else Unit
 
         if function.name is not None:
             if isinstance(function.name, nodes.Identifier):
-                func.name = function.name.name
+                name = function.name.name
             elif isinstance(function.name, nodes.Literal):
-                func.name = function.name.token_info.literal.value
+                name = function.name.token_info.literal.value
             else:
                 raise TypeError
         else:
-            func.name = None
+            name = None
 
-        if func.name:
-            self.x.current_scope.define(func.name, func)
+        func = Function(name, return_type, self.x.current_scope, [])
+        sig = func.signature
+
+        if name:
+            self.x.current_scope.define(name, func)
 
         for parameter in function.parameters:
-            parameter_type = self.execute(parameter.type) if parameter.type else _AnyType()
-            param = func.add_parameter(parameter.name.name, parameter_type)
+            parameter_type = self.execute(parameter.type) if parameter.type else Any
+            sig.define_parameter(parameter.name.name, parameter_type)
+
+        sig.build()
 
         if function.body:
-            func.body.nodes.extend(function.body)
+            func.body.extend(function.body)
 
         return func
 
@@ -379,7 +350,11 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             return Null.Instance
         match literal.token_info.literal.type:
             case TokenType.String:
-                return String(value)
+                return type("String", (ObjectProtocol,), {
+                    "runtime_type": Object,
+                    "native": str(value),
+                    "__str__": lambda s: s.native
+                })()
             case TokenType.Decimal:
                 return Int64(int(literal.token_info.literal.value))
             case TokenType.Real:
@@ -411,7 +386,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             for item in cls.items:
                 self.execute(item)
 
-            return class_
+        return class_
 
     @_exec
     def _(self, tc: nodes.TypeClass):
@@ -479,12 +454,12 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         if var_type is None:
             var_type = initializer.runtime_type
-        elif not isinstance(var_type, TypeProtocol):
+        if not isinstance(var_type, TypeProtocol):
             return self.state.error(f"'var' statement type must be a valid Z# type")
-        elif initializer is None:
+        if initializer is None:
             initializer = var_type.default()
 
-        if var_type is not None and not initializer.runtime_type.assignable_to(var_type):
+        if not initializer.runtime_type.assignable_to(var_type):
             return self.state.error(f"Initializer expression does not match the variable type", var)
 
         name = var.name.name.name
@@ -582,7 +557,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         return member
 
     def do_resolve_name(self, name: str):
-        item = self.x.current_scope.get_name(None, name)
+        item = self.x.current_scope.get_name(name)
         if self._srf_access:
             return item
         if isinstance(item, GetterProtocol):

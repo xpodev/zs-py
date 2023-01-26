@@ -5,8 +5,9 @@ from pathlib import Path
 from typing import Callable
 
 from zs.cli.options import Options, get_options
-from zs.ctrt.core import _AnyType, _VoidType, _UnitType, _TypeType
-from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
+from zs.ctrt.core import Any, Void, Unit, Type, FunctionType
+# from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
+from zs.ctrt.native import NativeFunction
 from zs.ctrt.objects import Core, Scope
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter
@@ -16,40 +17,40 @@ from zs.std.processing.import_system import ImportResult
 from zs.std.processing.toolchain import Toolchain
 
 
-class Builtins(NativeObject, ImportResult):
-    print = NativeFunction(print, "print")
-
-    def __init__(self):
-        super().__init__()
-
-    @property
-    def owner(self):
-        return Core
-
-    def all(self):
-        return {
-            "print": self.print
-        }.items()
-
-    def item(self, name: str):
-        return getattr(self, name)
-
-    def items(self, names: list[str]):
-        return list(map(partial(getattr, self), names))
+# class Builtins(NativeObject, ImportResult):
+#     print = NativeFunction(print, "print")
+#
+#     def __init__(self):
+#         super().__init__()
+#
+#     @property
+#     def owner(self):
+#         return Core
+#
+#     def all(self):
+#         return {
+#             "print": self.print
+#         }.items()
+#
+#     def item(self, name: str):
+#         return getattr(self, name)
+#
+#     def items(self, names: list[str]):
+#         return list(map(partial(getattr, self), names))
 
 
 class Compiler(StatefulProcessor):
     _context: ContextManager
     _toolchain: Toolchain
     _toolchain_factory: Callable[["Compiler"], Toolchain]
-    builtins: Builtins
+    # builtins: Builtins
 
     def __init__(self, *, state: State = None, context: ContextManager = None, toolchain_factory: Callable[["Compiler"], Toolchain] = None):
         super().__init__(state or State())
         self._context = context or ContextManager()
         self._toolchain_factory = toolchain_factory or (lambda _: Toolchain(state=self.state, context=self._context))
         self._toolchain = toolchain_factory(self)
-        self.builtins = Builtins()
+        # self.builtins = Builtins()
 
     @property
     def context(self):
@@ -88,7 +89,7 @@ def main(options: Options):
 
     import_system.add_importer(ZSImporter(import_system, compiler), ".zs")
 
-    builtins = compiler.builtins
+    # builtins = compiler.builtins
 
     # for name in vars(__builtins__):
     #     item = getattr(__builtins__, name)
@@ -97,17 +98,19 @@ def main(options: Options):
 
     global_scope = compiler.toolchain.interpreter.x.global_scope
 
-    global_scope.refer("Python", builtins)
+    # global_scope.refer("Python", builtins)
 
-    global_scope.refer("void", _VoidType())
-    global_scope.refer("unit", _UnitType())
-    global_scope.refer("any", _AnyType())
-    global_scope.refer("type", _TypeType())
+    global_scope.refer("print", NativeFunction(print, FunctionType([Any], Void), "print"))
 
-    global_scope.refer("bool", Boolean)
-    global_scope.refer("string", String)
-    global_scope.refer("i64", Int64)
-    global_scope.refer("f64", Float64)
+    global_scope.refer("void", Void)
+    global_scope.refer("unit", Unit)
+    global_scope.refer("any", Any)
+    global_scope.refer("type", Type)
+
+    # global_scope.refer("bool", Boolean)
+    # global_scope.refer("string", String)
+    # global_scope.refer("i64", Int64)
+    # global_scope.refer("f64", Float64)
 
     # def _assign(left, right):
     #     if isinstance(left, Field):
