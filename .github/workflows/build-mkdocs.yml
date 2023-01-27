@@ -28,7 +28,7 @@ jobs:
           path: .cache
       - name: Install dependencies
         run: |
-          python -m pip install mkdocs mkdocs-material
-      - name: Build with MkDocs
-        run: |
-          mkdocs build
+          python -m pip install mkdocs-material
+      - name: Build mkdocs
+        uses: jnanadarshan/mkdocs-build-action@v0.24
+
