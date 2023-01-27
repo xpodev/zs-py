@@ -4,7 +4,7 @@ from functools import partial
 from pathlib import Path
 from typing import Callable
 
-from zs.cli.options import Options, get_options
+from zs.cli.options import Options, get_options, InitOptions
 from zs.ctrt.core import Any, Void, Unit, Type, FunctionType
 # from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
 from zs.ctrt.native import NativeFunction
@@ -75,6 +75,10 @@ class Compiler(StatefulProcessor):
 
 
 def main(options: Options):
+    if isinstance(options, InitOptions):
+        from zs import project
+        return project.init(options)
+
     state = State()
     context = ContextManager()
 
