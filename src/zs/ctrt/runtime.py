@@ -4,11 +4,11 @@ from pathlib import Path
 
 from zs.ast.node import Node
 from zs.ast import node_lib as nodes
-from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class
+from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class, TypeClass, TypeClassImplementation
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
 # from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
 from zs.ctrt.objects import Frame, Scope
-from zs.ctrt.protocols import DynamicScopeProtocol, ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol
+from zs.ctrt.protocols import DynamicScopeProtocol, ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol, BindProtocol, SetterProtocol
 from zs.processing import StatefulProcessor, State
 from zs.std.processing.import_system import ImportSystem, ImportResult
 from zs.text.token import TokenType
@@ -246,7 +246,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     @_exec
     def _(self, call: nodes.FunctionCall):
-        group_or_function = self.execute(call.callable)
+        function = self.execute(call.callable)
 
         # is function really a function?
 
@@ -255,18 +255,6 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         # did we successfully evaluate the arguments?
 
         # can we unpack the arguments into the function parameters without any errors? I guess we should try...
-
-        if isinstance(group_or_function, OverloadGroup):
-            overloads = group_or_function.get_matching_overloads(arguments)
-
-            if len(overloads) > 1:
-                raise TypeError(f"Too many overloads were found")
-            if not len(overloads):
-                raise TypeError(f"Could not find a suitable overload")
-
-            function = overloads[0]
-        else:
-            function: Function = group_or_function
 
         return self.do_function_call(function, arguments)
 
@@ -390,7 +378,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     @_exec
     def _(self, tc: nodes.TypeClass):
-        type_class = TypeClass(tc.name.name, self.x.current_scope)
+        type_class = TypeClass(tc.name.name, None, self.x.current_scope)
 
         self.x.current_scope.define(type_class.name, type_class)
 
@@ -411,14 +399,14 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         if not isinstance(impl_type, TypeProtocol):
             raise TypeError(f"implementation for typeclass '{type_class.name}' must be a class")
 
-        implementation: Class = TypeClassImplementation(f"{type_class.name}.{impl_type}", self.x.current_scope, impl_type)
-        with self.x.scope(implementation, value=implementation), self.x.scope_protocol(implementation):
+        implementation = TypeClassImplementation(f"{type_class.name}.{impl_type}", self.x.current_scope, impl_type)
+        with self.x.scope(implementation, value=implementation):
             for item in impl.items:
                 self.execute(item)
 
-        for method in type_class.methods:
+        for method in type_class._methods:
             try:
-                impl = implementation.get_name(None, method.name)
+                impl = implementation.get_name(method.name)
                 #
                 # if isinstance(impl, FunctionGroup._BoundFunctionGroup):
                 #     impl = impl.group
@@ -549,7 +537,9 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         return function.call(arguments)
 
     def do_get_member(self, obj_srf, obj: ObjectProtocol, name: str):
-        member = obj_srf.runtime_type.get_name(obj, name)
+        member = obj_srf.type.get_name(name, instance=obj)
+        if isinstance(member, BindProtocol):
+            member = member.bind([obj])
         if self._srf_access:
             return member
         if isinstance(member, GetterProtocol):

@@ -76,7 +76,7 @@ class ImmutableScopeProtocol:
     Represents a scope that is read-only.
     """
 
-    def get_name(self, name: str) -> ObjectProtocol:
+    def get_name(self, name: str, **_) -> ObjectProtocol:
         """
         Returns the value associated with the given `name` in this scope.
 

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 from zs.cli.options import Options, get_options, InitOptions
-from zs.ctrt.core import Any, Void, Unit, Type, FunctionType
+from zs.ctrt.core import Any, Void, Unit, Type, FunctionType, Class, ClassType
 # from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
 from zs.ctrt.native import NativeFunction
 from zs.ctrt.objects import Core, Scope
@@ -110,6 +110,8 @@ def main(options: Options):
     global_scope.refer("unit", Unit)
     global_scope.refer("any", Any)
     global_scope.refer("type", Type)
+    # global_scope.refer("Class", ClassType)
+    global_scope.refer("Class", Class)
 
     # global_scope.refer("bool", Boolean)
     # global_scope.refer("string", String)
