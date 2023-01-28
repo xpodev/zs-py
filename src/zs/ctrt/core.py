@@ -13,12 +13,19 @@ from zs.ctrt.protocols import ClassProtocol, TypeProtocol, ObjectProtocol, Sette
 from zs.utils import SingletonMeta
 
 __all__ = [
-    "Type",
-    "Void",
-    "Unit",
     "Any",
+    "Class",
+    "ClassType",
+    "FunctionType",
     "Null",
-    "Object"
+    "Nullable",
+    "Object",
+    "Scope",
+    "Type",
+    "TypeClass",
+    "TypeClassImplementation",
+    "Unit",
+    "Void",
 ]
 
 _T = typing.TypeVar("_T")
@@ -290,6 +297,49 @@ class FunctionType(CallableTypeProtocol):
 # End Special Types
 
 
+class CallableAndBindProtocol(CallableProtocol, BindProtocol):
+    ...
+
+
+class DefaultCallableProtocol(CallableAndBindProtocol):
+    def bind(self, args: list[ObjectProtocol]):
+        return _PartialCallImpl(self, args)
+
+
+class _PartialCallImpl(DefaultCallableProtocol):
+    callable: CallableProtocol
+    args: list[ObjectProtocol]
+
+    class _PartialCallImplType(CallableTypeProtocol):
+        def __init__(self, bound: list[TypeProtocol], origin: CallableTypeProtocol):
+            self.bound = bound
+            self.origin = origin
+
+        def get_type_of_application(self, types: list[TypeProtocol]) -> TypeProtocol:
+            return self.origin.get_type_of_call(self.bound + types)
+
+        def compare_type_signature(self, other: "CallableProtocol") -> bool:
+            return other.runtime_type.compare_type_signature(self.origin)
+
+    def __init__(self, callable_: CallableProtocol, args: list[ObjectProtocol], type: CallableTypeProtocol):
+        self.callable = callable_
+        self.args = args
+        # self.runtime_type = self._PartialCallImplType(self.get_bound_argument_types(), self.callable.runtime_type)
+        self.runtime_type = type
+
+    def get_bound_argument_types(self):
+        return list(map(lambda arg: arg.runtime_type, self.args))
+
+    def get_type_of_application(self, types: list[TypeProtocol]) -> TypeProtocol:
+        return self.callable.runtime_type.get_type_of_call(self.get_bound_argument_types() + types)
+
+    def compare_type_signature(self, other: "CallableTypeProtocol") -> bool:
+        return other.compare_type_signature(self.runtime_type)
+
+    def call(self, args: list[ObjectProtocol]):
+        return self.callable.call(self.args + args)
+
+
 class OverloadGroupType(CallableTypeProtocol):
     group: "OverloadGroup"
 
@@ -311,7 +361,7 @@ class OverloadGroupType(CallableTypeProtocol):
         return overloads[0].runtime_type.get_type_of_call(types)
 
 
-class OverloadGroup(CallableProtocol):
+class OverloadGroup(CallableAndBindProtocol):
     overloads: list[CallableProtocol]
     runtime_type: OverloadGroupType
     parent: "OverloadGroup | None"
@@ -351,6 +401,17 @@ class OverloadGroup(CallableProtocol):
             raise TypeError
 
         return overloads[0].call(args)
+
+    def bind(self, args: list[ObjectProtocol]):
+        result = []
+        for overload in self.overloads:
+            if not isinstance(overload, BindProtocol):
+                continue
+            try:
+                result.append(overload.bind(args))
+            except TypeError:
+                result.append(overload)
+        return OverloadGroup(self.parent.bind(args) if self.parent else None, *result)
 
     def build(self):
         # self.runtime_type =
@@ -484,45 +545,7 @@ class FunctionSignature(ObjectProtocol):
         self.runtime_type = FunctionType(list(map(lambda p: p.type, self.parameters)), self.return_type)
 
 
-class DefaultCallableProtocol(CallableProtocol, BindProtocol):
-    def bind(self, args: list[ObjectProtocol]):
-        return _PartialCallImpl(self, args)
-
-
-class _PartialCallImpl(DefaultCallableProtocol):
-    callable: CallableProtocol
-    args: list[ObjectProtocol]
-
-    class _PartialCallImplType(CallableTypeProtocol):
-        def __init__(self, bound: list[TypeProtocol], origin: CallableTypeProtocol):
-            self.bound = bound
-            self.origin = origin
-
-        def get_type_of_application(self, types: list[TypeProtocol]) -> TypeProtocol:
-            return self.origin.get_type_of_call(self.bound + types)
-
-        def compare_type_signature(self, other: "CallableProtocol") -> bool:
-            return other.runtime_type.compare_type_signature(self.origin)
-
-    def __init__(self, callable_: CallableProtocol, args: list[ObjectProtocol]):
-        self.callable = callable_
-        self.args = args
-        self.runtime_type = self._PartialCallImplType(self.get_bound_argument_types(), self.callable.runtime_type)
-
-    def get_bound_argument_types(self):
-        return list(map(lambda arg: arg.runtime_type, self.args))
-
-    def get_type_of_application(self, types: list[TypeProtocol]) -> TypeProtocol:
-        return self.callable.runtime_type.get_type_of_call(self.get_bound_argument_types() + types)
-
-    def compare_type_signature(self, other: "CallableTypeProtocol") -> bool:
-        return other.compare_type_signature(self.runtime_type)
-
-    def call(self, args: list[ObjectProtocol]):
-        return self.callable.call(self.args + args)
-
-
-class Function(DefaultCallableProtocol):
+class Function(CallableAndBindProtocol):
     """
     Represents a Z# function.
     """
@@ -585,6 +608,14 @@ class Function(DefaultCallableProtocol):
                         raise TypeError(f"Function {self} marked as non-void did not return value")
             except ReturnInstructionInvoked as e:
                 return e.value
+
+    def bind(self, args: list[ObjectProtocol]):
+        if len(args) > len(self.signature.parameters):
+            raise TypeError
+        for arg, parameter in zip(args, self.signature.parameters):
+            if not arg.is_instance_of(parameter.type):
+                raise TypeError
+        return _PartialCallImpl(self, args, FunctionType(list(map(lambda p: p.type, self.signature.parameters[len(args):])), self.signature.return_type))
 
 
 class _ObjectType(ClassProtocol, metaclass=SingletonMeta):
@@ -651,14 +682,14 @@ class Scope(ScopeProtocol):
                 if scope is None:
                     return None
                 try:
-                    parent = self._owner.parent.get_name(key)
+                    parent = scope.get_name(key)
                 except NameNotFoundError:
                     return None
                 else:
                     if isinstance(parent, CallableProtocol):
                         parent = OverloadGroup(_get_overload_group_parent(scope.parent), parent)
                     if not isinstance(parent, OverloadGroup):
-                        return None
+                        return _get_overload_group_parent(scope.parent)
                     return parent
 
             if isinstance(value, Function):
@@ -841,7 +872,17 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
                 raise TypeError(f"Can only bind class field '{self.owner}.{self.name}' to subclasses of {self.owner}")
             return self._BoundField(instance, self.name)
 
-    class _Method(_Member[Function]):
+    class _Method(_Member[CallableAndBindProtocol], CallableProtocol):
+        def __init__(self, name: str, owner: "Class", original: CallableAndBindProtocol):
+            super().__init__(name, owner, original)
+
+        @property
+        def runtime_type(self):
+            return self.original.runtime_type
+
+        def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+            return self.bind(args).call([])
+
         def bind(self, args: list[ObjectProtocol]):
             if self.is_static:
                 return self.original.bind(args)
@@ -882,7 +923,7 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
         self._scope = Scope(lexical_scope)
 
         self.constructor = OverloadGroup(None)
-        self.runtime_type = metaclass or ClassType
+        self.type = self.runtime_type = metaclass or ClassType
 
     # @property
     # def runtime_type(self):
@@ -897,7 +938,9 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
         return self.base
 
     def get_name(self, name: str, instance: "Class" = None) -> ObjectProtocol:
-        result = self._scope.get_name(name)
+        if instance is None:
+            return self._scope.parent.get_name(name)
+        result = self._scope.get_name(name, instance=instance)
 
         return result
 
@@ -941,7 +984,7 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
         field.is_instance = True
         self._scope.define(name, field)
 
-    def define_method(self, name: str, function: Function):
+    def define_method(self, name: str, function: CallableAndBindProtocol):
         method = self._Method(name, self, function)
         method.is_instance = True
         self._scope.define(name, method)
@@ -973,192 +1016,13 @@ class _ClassType(Class, CallableTypeProtocol, metaclass=SingletonMeta):
     def get_type_of_call(self, types: list[TypeProtocol]) -> TypeProtocol:
         return self.constructor.runtime_type.get_type_of_call(types)
 
+    def get_name(self, name: str, instance: "Class" = None) -> ObjectProtocol:
+        if isinstance(instance, Class):
+            return instance.get_name(name, instance)
+
 
 ClassType = _ClassType()
-
-# class _Object(ObjectProtocol):
-#     """
-#     The base type for Z# objects. Not to be confused with `ObjectType`, this class
-#     is the base structure for Z# OOP objects, not classes.
-#
-#     You can inherit this class to create Z# OOP objects that behave differently.
-#
-#     If what you want is to create a class, you can either inherit `_ObjectType` or
-#     instantiate a new `Class` object.
-#     """
-#
-#     _data: list[ObjectProtocol]
-#
-#     def __init__(self, type: "_ObjectType"):
-#         self._data = [field.type.default() for field in type.fields] if type is not None else []
-#         self.runtime_type = type
-#
-#     @property
-#     def data(self):
-#         return self._data
-#
-#     def __repr__(self):
-#         return f"<Z# object of type {self.runtime_type}>"
-#
-#
-# class _ObjectType(_Object, ClassProtocol):
-#     """
-#     The `object` type. This is the base type of all OOP classes.
-#
-#     Do not instantiate this class, since it is only the base structure of a class.
-#
-#     You can inherit this type to create a type that is considered an OOP class but
-#     behaves differently, with the new behavior defined in native Python.
-#     """
-#
-#     class _Field(BindProtocol):
-#         name: str
-#         type: TypeProtocol
-#         initializer: ObjectProtocol
-#
-#         is_static: bool
-#
-#         _index: int
-#         _owner: "_ObjectType"
-#
-#         def __init__(self, name: str, type: TypeProtocol, index: int, initializer: ObjectProtocol | None, owner: "_ObjectType"):
-#             self.name = name
-#             self.type = type
-#             self.initializer = initializer or self.type.default()
-#             self._index = index
-#             self._owner = owner
-#
-#             self.is_static = False
-#
-#         def get(self, instance: "_Object"):
-#             if not isinstance(instance, _Object):
-#                 raise TypeError(f"'instance' must be a valid Z# OOP object.")
-#             if self.is_static:
-#                 return self._owner.data[self.index]
-#
-#             return instance.data[self.index]
-#
-#         def set(self, instance: "_Object", value: ObjectProtocol):
-#             if not isinstance(instance, _Object):
-#                 raise TypeError(f"'instance' must be a valid Z# OOP object.")
-#
-#             if not self.type.is_instance(value):
-#                 raise TypeError(f"'value' must be an instance of type '{self.type}'")
-#             if self.is_static:
-#                 self._owner.data[self.index] = value
-#             else:
-#                 instance.data[self.index] = value
-#
-#         def bind(self, args: [ObjectProtocol]) -> "_ObjectType._BoundField":
-#             if len(args) != 1:
-#                 raise TypeError(f"May only bind a field to a single instance")
-#             instance = args[0]
-#             if not isinstance(instance, _Object):
-#                 raise TypeError("A field may only be bound to OOP objects.")
-#             if not self.is_static:
-#                 if not self._owner.is_instance(instance):
-#                     raise TypeError(f"'instance' must be an instance of '{self._owner}'")
-#             else:
-#                 if isinstance(instance, _ObjectType) and not instance.is_subclass_of(self._owner):
-#                     raise TypeError(f"'instance' must be a subclass of 'owner' in order to bind to a static field")
-#                 instance = self._owner
-#             return _ObjectType._BoundField(self, instance)
-#
-#         @property
-#         def index(self):
-#             return self._index
-#
-#         @property
-#         def owner(self):
-#             return self._owner
-#
-#     class _BoundField(GetterProtocol, SetterProtocol):
-#         _field: "_ObjectType._Field"
-#         _instance: "_Object"
-#
-#         def __init__(self, field: "_ObjectType._Field", instance: "_Object"):
-#             self._field = field
-#             self._instance = instance
-#
-#         def get(self):
-#             return self._field.get(self._instance)
-#
-#         def set(self, value: ObjectProtocol):
-#             self._field.set(self._instance, value)
-#
-#     class _Method:
-#         ...
-#
-#     Instance = None
-#
-#     _fields: list[_Field]
-#     _methods: list[_Method]
-#     _items: dict[str, _Field | _Method]
-#
-#     def __init__(self, metaclass: Optional["_ObjectType"] = None):
-#         if self.Instance is None:
-#             self.Instance = self
-#         self._fields = []
-#         super().__init__(metaclass or self.Instance)
-#         self._methods = []
-#         self._items = {}
-#
-#     def add_field(self, name: str, type: TypeProtocol, initializer: ObjectProtocol | None):
-#         if name in self._items:
-#             raise MemberAlreadyDefinedError(f"Type '{self}' already defines a member '{name}'")
-#         self._items[name] = field = self._Field(name, type, len(self._fields), initializer, self)
-#         self._fields.append(field)
-#
-#     def add_method(self, name: str, method):
-#         self._items[name] = method
-#         self._methods.extend(getattr(method, "overloads", [method]))
-#
-#     def get_base(self) -> ClassProtocol | None:
-#         return None
-#
-#     def get_name(self, instance: ObjectProtocol | None, name: str):
-#         if instance is not None and not isinstance(instance, _Object):
-#             raise TypeError("'instance' must be a valid OOP object.")
-#         try:
-#             member = self._items[name]
-#             if isinstance(member, BindProtocol):
-#                 return member.bind([instance if instance is not None else self])
-#             return member
-#         except KeyError:
-#             raise UnknownMemberError(f"Type '{self}' does not define member '{name}'")
-#
-#     def set_name(self, instance: ObjectProtocol | None, name: str, value: ObjectProtocol):
-#         ...
-#
-#     def assignable_to(self, target: "TypeProtocol") -> bool:
-#         if not isinstance(target, _ObjectType):
-#             return super().assignable_to(target)
-#
-#         return self.is_subclass_of(target)
-#
-#     def is_subclass_of(self, base: "_ObjectType"):
-#         if not isinstance(base, ClassProtocol):
-#             raise TypeError(f"Subclass check must be done on a class protocol type")
-#
-#         cls = self
-#         while cls is not None:
-#             if base == cls:
-#                 return True
-#             cls = cls.get_base()
-#
-#         return False
-#
-#     @classmethod
-#     def default(cls) -> ObjectProtocol:
-#         raise TypeError(f"Type '{cls}' does not define a default value")
-#
-#     @property
-#     def fields(self):
-#         return self._fields.copy()
-#
-#     @property
-#     def methods(self):
-#         return self._methods.copy()
+del _ClassType
 
 
 class Nullable(TypeProtocol):
@@ -1208,6 +1072,14 @@ class TypeClass(Class):
         except KeyError:
             raise TypeError(f"type {instance.runtime_type} does not implement typeclass {self.name}")
 
+    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+        if len(args) != 1:
+            raise TypeError(f"Parameterized typeclasses are not yet implemented")
+        type = args[0]
+        if not isinstance(type, TypeProtocol):
+            raise TypeError(f"May only get typeclass implementation for a type")
+        return self._implementations[type].implementation
+
     def add_implementation(self, type: TypeProtocol, implementation: "TypeClassImplementation"):
         if type in self._implementations:
             raise TypeError(f"type '{type}' already implements '{self}'")
@@ -1218,15 +1090,20 @@ class TypeClass(Class):
 
 
 class TypeClassImplementation(Class):
-    implemented_type: "Class"
+    implemented_type: TypeProtocol
 
-    def __init__(self, name: str, lexical_scope: ScopeProtocol, implemented_type: "Class"):
+    def __init__(self, name: str, lexical_scope: ScopeProtocol, implemented_type: TypeProtocol):
         super().__init__(name, None, lexical_scope)
         self.implemented_type = implemented_type
 
     def dispose(self):
         super().dispose()
 
-        for _, member in self._scope.members:
+        def _bind_to_implemented_type(member):
             if isinstance(member, self._Member):
                 member.owner = self.implemented_type
+            if isinstance(member, OverloadGroup):
+                for overload in member.overloads:
+                    _bind_to_implemented_type(overload)
+
+        _ =[*map(_bind_to_implemented_type, self._scope.members.mapping.values())]

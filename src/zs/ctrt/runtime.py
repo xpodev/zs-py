@@ -7,6 +7,7 @@ from zs.ast import node_lib as nodes
 from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class, TypeClass, TypeClassImplementation
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
 # from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
+from zs.ctrt.native import Boolean, Int64, Float64, String
 from zs.ctrt.objects import Frame, Scope
 from zs.ctrt.protocols import DynamicScopeProtocol, ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol, BindProtocol, SetterProtocol
 from zs.processing import StatefulProcessor, State
@@ -338,15 +339,11 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             return Null.Instance
         match literal.token_info.literal.type:
             case TokenType.String:
-                return type("String", (ObjectProtocol,), {
-                    "runtime_type": Object,
-                    "native": str(value),
-                    "__str__": lambda s: s.native
-                })()
+                return String(value)
             case TokenType.Decimal:
-                return Int64(int(literal.token_info.literal.value))
+                return Int64(int(value))
             case TokenType.Real:
-                return Float64(float(literal.token_info.literal.value))
+                return Float64(float(value))
             case _:
                 raise TypeError(literal.token_info.literal.type)
 
@@ -390,14 +387,14 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     @_exec
     def _(self, impl: nodes.TypeClassImplementation):
-        type_class: TypeClass = self.execute(impl.name)
-        impl_type: TypeProtocol = self.execute(impl.implemented_type)
+        type_class = self.execute(impl.name)
+        impl_type = self.execute(impl.implemented_type)
 
         if not isinstance(type_class, TypeClass):
             raise TypeError(f"'{impl.name}' is not a valid type class")
 
         if not isinstance(impl_type, TypeProtocol):
-            raise TypeError(f"implementation for typeclass '{type_class.name}' must be a class")
+            raise TypeError(f"implementation for typeclass '{type_class.name}' must be a type")
 
         implementation = TypeClassImplementation(f"{type_class.name}.{impl_type}", self.x.current_scope, impl_type)
         with self.x.scope(implementation, value=implementation):

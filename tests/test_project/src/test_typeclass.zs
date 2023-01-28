@@ -1,5 +1,6 @@
-import { print } from Python;
-import { Foo } from "src/main.zs";
+//import { print } from Python;
+//import { Foo } from "src/main.zs";
+// import { Foo } from "test_project.main.zs"; // circular import. infinite loop
 
 
 typeclass IPrint {
@@ -7,26 +8,31 @@ typeclass IPrint {
 }
 
 
-typeclass IPrint(Foo) {
-    fun print() {
-        Foo.baz();
-        Python.print(IPrint(Foo).print);
-        Python.print(print);
-        Python.print(this);
-    }
-}
+//typeclass IPrint(Foo) {
+//    fun print() {
+//        Foo.baz();
+//        print(IPrint(Foo).print);
+//        print(print);
+//        print(this);
+//    }
+//}
 
 
 typeclass IPrint(i64) {
-    fun print() {
-        Python.print("Number", this);
+    fun print(this: i64) {
+        print("Number");
+        IPrint(i64).print(this, "Hello");
+    }
+
+    fun print(this: i64, x: string) {
+        print("IPrint<i64>.print(i64, string)");
     }
 }
 
 
 typeclass IPrint(f64) {
-    fun print() {
-        Python.print("Float!,", this);
+    fun print(this: f64) {
+        print("Float!,");
     }
 }
 
@@ -36,6 +42,6 @@ fun do_print(x: IPrint)
     x.print();
 }
 
-do_print(Foo());
+// do_print(Foo());
 do_print(45);
 do_print(3.14);

@@ -7,7 +7,7 @@ from typing import Callable
 from zs.cli.options import Options, get_options, InitOptions
 from zs.ctrt.core import Any, Void, Unit, Type, FunctionType, Class, ClassType
 # from zs.ctrt.native import NativeObject, NativeFunction, Boolean, String, Int64, Float64
-from zs.ctrt.native import NativeFunction
+from zs.ctrt.native import NativeFunction, Boolean, String, Int64, Float64
 from zs.ctrt.objects import Core, Scope
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter
@@ -113,10 +113,10 @@ def main(options: Options):
     # global_scope.refer("Class", ClassType)
     global_scope.refer("Class", Class)
 
-    # global_scope.refer("bool", Boolean)
-    # global_scope.refer("string", String)
-    # global_scope.refer("i64", Int64)
-    # global_scope.refer("f64", Float64)
+    global_scope.refer("bool", Boolean)
+    global_scope.refer("string", String)
+    global_scope.refer("i64", Int64)
+    global_scope.refer("f64", Float64)
 
     # def _assign(left, right):
     #     if isinstance(left, Field):

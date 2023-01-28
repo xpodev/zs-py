@@ -1,4 +1,4 @@
-import { print } from Python;
+//import { print } from Python;
 
 fun print2(value) {
     print(value);
