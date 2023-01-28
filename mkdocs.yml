@@ -135,12 +135,15 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - pymdownx.tilde
+  - pymdownx.snippets
 
 # Page tree
 nav:
   - Home: index.md
   - Getting started:
     - Installation: getting-started/installation.md
-    - Creating your first program: getting-started/hello-world.md
+    - Variables: getting-started/variables.md
+    - Functions: getting-started/functions.md
+    - Classes: getting-started/classes.md
   - Reference:
     - reference/index.md
