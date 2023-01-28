@@ -118,10 +118,6 @@ class NativeValue(NativeClass, typing.Generic[_T]):
     def native(self):
         return self._native
 
-    @classmethod
-    def default(cls):
-        return cls.Type.default()
-
     # Python stuff
 
     def __str__(self):
