@@ -3,6 +3,7 @@
 // import {} from "src/test_typeclass.zs";
 // import {} from "src/test_export.zs";
 
+print("Hello, World!");
 
 fun foo() {
     print("blah");
