@@ -23,7 +23,7 @@ site_name: Z# Language
 site_url: https://xpodev.github.io/zs-py/
 site_author: Binyamin Y Cohen
 site_description: >-
-  Meh
+  The official Z# language documentation. Currently on pre-alpha, hoping no one will see this.
 
 # Repository
 repo_name: xpodev/zs-py
