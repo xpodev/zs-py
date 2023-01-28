@@ -976,7 +976,7 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
 
     # OOP Class Stuff
 
-    def define_constructor(self, function: Function):
+    def define_constructor(self, function: CallableProtocol):
         self.constructor.add_overload(function)
 
     def define_field(self, name: str, type: TypeProtocol, initializer: ObjectProtocol = None):
