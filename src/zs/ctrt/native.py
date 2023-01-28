@@ -66,30 +66,6 @@ class NativeField:
         self.value = value or type.default()
 
 
-# class NativeObject(, metaclass=_NativeClassMeta):
-#     def __init__(self):
-#         super().__init__(type(self))
-#
-#     def __setattr__(self, name, value):
-#         if name not in self._items:
-#             self._items[name] = value
-#         super().__setattr__(name, value)
-#
-#     def __getattr__(self, item):
-#         try:
-#             result = self.__getattribute__(item)
-#         except AttributeError:
-#             try:
-#                 result = self._items[item]
-#             except KeyError:
-#                 raise AttributeError
-#         if isinstance(result, BindProtocol):
-#             result = result.bind([self])
-#         if isinstance(result, GetterProtocol):
-#             return result.get()
-#         return result
-
-
 class NativeFunction(CallableAndBindProtocol):
     name: str
     _native: Callable[..., typing.Any]
@@ -131,8 +107,6 @@ class NativeConstructor:
 
 
 class NativeValue(NativeClass, typing.Generic[_T]):
-    Type: TypeProtocol  # implement on class level
-
     _native: _T
 
     def __init__(self, native: _T):

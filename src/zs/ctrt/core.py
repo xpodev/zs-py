@@ -14,6 +14,7 @@ from zs.utils import SingletonMeta
 
 __all__ = [
     "Any",
+    "CallableAndBindProtocol",
     "Class",
     "ClassType",
     "FunctionType",
