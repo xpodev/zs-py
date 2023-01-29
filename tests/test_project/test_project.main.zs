@@ -3,6 +3,7 @@ import {} from "env/setup.zs";
 import {} from "src/test_typeclass.zs";
 // import {} from "src/test_export.zs";
 import {} from "src/test_callable.zs";
+import {} from "src/test_module.zs";
 
 print("Hello, World!");
 

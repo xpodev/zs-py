@@ -342,7 +342,7 @@ class Module(Node[token_info.Module]):
             _semicolon: Token = None
     ):
         super().__init__(token_info.Module(_module, _left_bracket, _right_bracket, _semicolon))
-        self.name = name.name
+        self.name = name.name if name is not None else None
         self.items = items if items is not None else items
 
 

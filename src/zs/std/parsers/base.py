@@ -390,17 +390,19 @@ def parse_class(parser: Parser) -> Class:
 def parse_module(parser: Parser) -> Module:
     keyword = parser.eat("module")
 
-    name = _identifier(parser)
+    name = _identifier(parser, default=None)
 
+    items = []
     if parser.token(';'):
         _semicolon = parser.eat(';')
         _left_bracket = _right_bracket = None
-        items = []
     else:
         _semicolon = None
         _left_bracket = parser.eat('{')
 
-        items = _many(_next("Document"))
+        # items = _many(_next("Document"))(parser)
+        while not parser.token('}'):
+            items.append(parser.next("Document"))
 
         _right_bracket = parser.eat('}')
 
@@ -680,6 +682,7 @@ class ExpressionParser(ContextualParser[Expression]):
         ))
 
         self.add_parser(copy_with(parse_function, binding_power=0))
+        self.add_parser(copy_with(parse_module, binding_power=0))
         self.add_parser(copy_with(parse_class, binding_power=0))
         self.add_parser(copy_with(parse_type_class, binding_power=0))
 

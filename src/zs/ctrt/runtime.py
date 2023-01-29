@@ -4,7 +4,7 @@ from pathlib import Path
 
 from zs.ast.node import Node
 from zs.ast import node_lib as nodes
-from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class, TypeClass, TypeClassImplementation
+from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class, TypeClass, TypeClassImplementation, Module
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
 # from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
 from zs.ctrt.native import Boolean, Int64, Float64, String
@@ -299,7 +299,6 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     @_exec
     def _(self, if_: nodes.If):
-
         with self.x.scope():
             condition = self.execute(if_.condition)
 
@@ -357,7 +356,16 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
     @_exec
     def _(self, module: nodes.Module):
-        ...
+        mod = Module(module.name, self.x.current_scope)
+
+        if mod.name:
+            self.x.current_scope.refer(mod.name, mod)
+
+        with self.x.scope(mod):
+            for item in module.items:
+                self.execute(item)
+
+        return mod
 
     @_exec
     def _(self, cls: nodes.Class):
@@ -534,7 +542,10 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         return function.call(arguments)
 
     def do_get_member(self, obj_srf, obj: ObjectProtocol, name: str):
-        member = obj_srf.type.get_name(name, instance=obj)
+        try:
+            member = obj_srf.type.get_name(name, instance=obj)
+        except AttributeError:
+            member = obj_srf.get_name(name, instance=obj)
         if isinstance(member, BindProtocol):
             member = member.bind([obj])
         if self._srf_access:

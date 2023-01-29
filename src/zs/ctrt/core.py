@@ -1115,6 +1115,9 @@ class TypeClass(Class):
     def get_implementation(self, type: TypeProtocol) -> "TypeClassImplementation":
         return self._implementations[type].implementation
 
+    def __repr__(self):
+        return f"<Z# TypeClass {self.name}>"
+
 
 class TypeClassImplementation(Class):
     implemented_type: TypeProtocol
@@ -1134,3 +1137,37 @@ class TypeClassImplementation(Class):
                     _bind_to_implemented_type(overload)
 
         _ =[*map(_bind_to_implemented_type, self._scope.members.mapping.values())]
+
+
+class Module(ScopeProtocol, DisposableProtocol):
+    """
+    A class that represents a Z# module.
+    """
+
+    _scope: Scope
+
+    name: str
+    entry_point: CallableProtocol | None
+
+    def __init__(self, name: str, lexical_scope: ScopeProtocol, entry_point: CallableProtocol | None = None):
+        self.name = name
+        self.entry_point = entry_point
+        self._scope = Scope(lexical_scope)
+
+    def define(self, name: str, value: ObjectProtocol):
+        self._scope.define(name, value)
+
+    def refer(self, name: str, value: ObjectProtocol):
+        self._scope.refer(name, value)
+
+    def get_name(self, name: str, **_) -> ObjectProtocol:
+        return self._scope.get_name(name, **_)
+
+    def all(self) -> list[tuple[str, ObjectProtocol]]:
+        return self._scope.all()
+
+    def dispose(self):
+        ...
+
+    def __repr__(self):
+        return f"<Z# Module {self.name if self.name else '{Anonymous}'}>"
