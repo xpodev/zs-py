@@ -40,7 +40,7 @@ def _get_dict_from_import_result(node: nodes.Import, result: ImmutableScopeProto
                         if not isinstance(item.expression, nodes.Identifier):
                             errors.append(f"Imported name must be an identifier")
                         item_name = item.expression.name
-                        res[name.name] = result.item(item_name)
+                        res[name.name] = result.get_name(item_name)
                     else:
                         res[name] = result.get_name(name)
                 except KeyError:
@@ -325,7 +325,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         for error in errors:
             self.state.error(error, import_)
 
-        return result
+        return Scope(None, **items)
 
     @_exec
     def _(self, literal: nodes.Literal):
@@ -436,6 +436,11 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     def _(self, return_: nodes.Return):
         expression = self.execute(return_.expression) if return_.expression else None
         raise ReturnInstructionInvoked(expression)
+
+    @_exec
+    def _(self, set_: nodes.Set):
+        value = self.execute(set_.expression)
+        self.x.global_scope.refer(set_.name.name, value)
 
     @_exec
     def _(self, var: nodes.Var):

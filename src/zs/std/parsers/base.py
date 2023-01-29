@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 
 from zs.ast.node import Node
 from zs.ast.node_lib import Function, Class, If, Expression, Binary, ExpressionStatement, Identifier, Literal, Module, Import, Alias, TypedName, FunctionCall, MemberAccess, Block, Return, While, \
-    Continue, Break, When, Var, TypeClass, TypeClassImplementation, Assign, Export
+    Continue, Break, When, Var, TypeClass, TypeClassImplementation, Assign, Export, Set
 from zs.processing import State
 from zs.std.parsers.misc import subparser, copy_with
 from zs.text.errors import ParseError
@@ -199,6 +199,7 @@ def parse_export(parser: Parser) -> Export:
     _l_curly = _r_curly = None
 
     source = True
+    _from = _semicolon = None
     if parser.token('*'):
         exported_items = Identifier(parser.eat('*'))
         if parser.token("as"):
@@ -232,16 +233,20 @@ def parse_export(parser: Parser) -> Export:
 
         if parser.token("as"):
             exported_items = Alias(exported_items, parser.eat("as"), _identifier(parser))
+            _semicolon = parser.eat(';')
 
         source = None
 
-    _from = _semicolon = None
     if source:
         _from = parser.eat("from")
 
-        source = parser.next("Expression")
+        source = _one_of(
+            parse_import,
+            _next("ExpressionStatement")
+        )(parser)
 
-        _semicolon = parser.eat(';')
+        # _semicolon = parser.eat(';')
+        _semicolon = None
 
     return Export(keyword, _l_curly, exported_items, _r_curly, _from, source, _semicolon)
 
@@ -414,6 +419,21 @@ def parse_module(parser: Parser) -> Module:
         _right_bracket,
         _semicolon
     )
+
+
+@subparser("set")
+def parse_set(parser: Parser) -> Set:
+    keyword = parser.eat("set")
+
+    name = _identifier(parser)
+
+    _equals = parser.eat('=')
+
+    expression = parser.next("Expression")
+
+    _semicolon = parser.eat(';')
+
+    return Set(keyword, name, _equals, expression, _semicolon)
 
 
 @subparser("typeclass")
@@ -804,6 +824,7 @@ def get_parser(state: State):
         parse_function,
         parse_class,
         parse_module,
+        parse_set,
         parse_type_class,
         parse_var,
 

@@ -18,6 +18,7 @@ __all__ = [
     "Class",
     "ClassType",
     "FunctionType",
+    "Module",
     "Null",
     "Nullable",
     "Object",
@@ -718,7 +719,7 @@ class Scope(ScopeProtocol):
     def __init__(self, parent: Optional[ScopeProtocol] = None, **items: ObjectProtocol):
         self._parent = parent
         self._items = self._Scope(self, **items)
-        self._members = self._Scope(self)
+        self._members = self._Scope(self, **items)
 
     @property
     def is_toplevel_scope(self):
@@ -749,7 +750,7 @@ class Scope(ScopeProtocol):
         return self.parent.get_name(name)
 
     def define(self, name: str, value):
-        self.refer(name, value)
+        self._items[name] = value
         self._members[name] = value
 
     def refer(self, name: str, value):
@@ -757,6 +758,11 @@ class Scope(ScopeProtocol):
 
     def all(self) -> list[tuple[str, ObjectProtocol]]:
         return [(name, item) for name, item in self._members.items()]
+
+
+class ExportScope(Scope):
+    def refer(self, name: str, value):
+        self._members[name] = value
 
 
 class ObjectImpl:
@@ -1000,7 +1006,7 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
                 bases.append(ObjectImpl.CallableProtocol)
                 break
 
-        self._instance_factory = type(self.name, tuple(bases), {})
+        self._instance_factory = type(self.name or "{Anonymous}", tuple(bases), {})
 
     # OOP Class Stuff
 
@@ -1154,7 +1160,7 @@ class Module(ScopeProtocol, DisposableProtocol):
     name: str
     entry_point: CallableProtocol | None
 
-    def __init__(self, name: str, lexical_scope: ScopeProtocol, entry_point: CallableProtocol | None = None):
+    def __init__(self, name: str, lexical_scope: ScopeProtocol | None, entry_point: CallableProtocol | None = None):
         self.name = name
         self.entry_point = entry_point
         self._scope = Scope(lexical_scope)

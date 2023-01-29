@@ -7,7 +7,7 @@ import typing
 from functools import partial
 from typing import Callable
 
-from .core import Class, CallableAndBindProtocol, FunctionType, Any
+from .core import Class, CallableAndBindProtocol, FunctionType, Any, Type, Unit
 from .protocols import *
 from .protocols import ObjectProtocol
 
@@ -24,23 +24,11 @@ class _NativeClassMeta(type, Class):
         Class.__init__(cls, name, base, None, None)
         for name, item in namespace.items():
             if getattr(item, "__zs_native_function__", False):
-                if not callable(item):
-                    raise TypeError
-                sig = inspect.signature(item)
-                types = []
-                for parameter in sig.parameters.values():
-                    annotation = parameter.annotation
-                    if annotation is sig.empty:
-                        annotation = Any
-                    if annotation is _Self:
-                        annotation = cls
-                    if not isinstance(annotation, TypeProtocol):
-                        raise TypeError(f"Native function must only have Z# types as parameters")
-                    types.append(annotation)
-                return_type = sig.return_annotation if sig.return_annotation is not sig.empty else Any
-                fn_type = FunctionType(types, return_type)
-                name = getattr(item, "__zs_native_name__", name)
-                item = NativeFunction(item, fn_type, name)
+                item = py_function_to_zs_function(name, item, {
+                    _Self: cls,
+                    inspect.Signature.empty: Any
+                })
+                name = item.name
             if not isinstance(item, ObjectProtocol):
                 continue
             if isinstance(item, NativeFunction):
@@ -56,6 +44,28 @@ class _NativeClassMeta(type, Class):
 
     # def get_name(self, name: str, instance: "Class | Class._Instance" = None) -> ObjectProtocol:
     #     return super().get_name(name, instance=instance)
+
+
+def py_function_to_zs_function(name, fn, transform: dict = None):
+    if not callable(fn):
+        raise TypeError
+    if transform is None:
+        transform = {}
+    sig = inspect.signature(fn)
+    types = []
+    for parameter in sig.parameters.values():
+        annotation = parameter.annotation
+        if annotation in transform:
+            annotation = transform[annotation]
+        if not isinstance(annotation, TypeProtocol):
+            raise TypeError(f"Native function must only have Z# types as parameters")
+        types.append(annotation)
+    if sig.return_annotation in transform:
+        return_type = transform[sig.return_annotation]
+    else:
+        return_type = sig.return_annotation
+    fn_type = FunctionType(types, return_type)
+    return NativeFunction(fn, fn_type, getattr(fn, "__zs_native_name__", name))
 
 
 class NativeClass(ObjectProtocol, metaclass=_NativeClassMeta):
@@ -166,6 +176,31 @@ def native_fn(name_or_fn: str | Callable = None):
 
 def native_constructor(fn: Callable[[_T], _U]):
     return native_fn()(fn)
+
+
+_DEFAULT = object()
+
+
+def native_function(name: str = None, transform: dict = _DEFAULT):
+    def wrapper(fn):
+        nonlocal transform
+
+        if not callable(fn):
+            raise TypeError
+
+        if transform is _DEFAULT:
+            transform = {
+                str: String,
+                int: Int64,
+                float: Float64,
+                bool: Boolean,
+                type: Type,
+                None: Unit
+            }
+
+        return py_function_to_zs_function(name or fn.__name__, native_fn(fn), transform)
+
+    return wrapper
 
 
 # native types

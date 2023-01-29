@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import zs.ctrt
-from zs.ctrt.core import Module
+from zs.ctrt.core import Module, ExportScope
 from zs.ctrt.objects import Scope
 from zs.ctrt.runtime import Interpreter
 from zs.processing import StatefulProcessor, State
@@ -68,7 +68,7 @@ class Toolchain(StatefulProcessor):
 
             with self.interpreter.new_context():
 
-                with self.interpreter.x.scope() as export_scope, self.interpreter.x.scope():
+                with self.interpreter.x.scope(ExportScope(self.interpreter.x.global_scope)) as export_scope, self.interpreter.x.scope():
 
                     self.interpreter.run()
 

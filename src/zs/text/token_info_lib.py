@@ -257,6 +257,15 @@ class Return(TokenInfo):
 
 
 @dataclass(**_cfg)
+class Set(TokenInfo):
+    keyword_set: Token
+
+    equals: Token
+
+    semicolon: Token
+
+
+@dataclass(**_cfg)
 class Tuple(TokenInfo):
     """
     Token info for the 'tuple' node:

@@ -1,7 +1,8 @@
-import {} from "env/setup.zs";
+import * from "env/setup.zs";
+print(i64);
 //import {} from "src/main.zs";
 import {} from "src/test_typeclass.zs";
-// import {} from "src/test_export.zs";
+import {} from "src/test_export.zs";
 import { Callable } from "src/test_callable.zs";
 // import {} from "src/test_module.zs";
 
@@ -31,7 +32,7 @@ fun foo(_: unit) {
 
 {
     fun foo(x: type) {
-        print("Nested", x);
+        print("Nested");
     }
 
     foo(unit);
