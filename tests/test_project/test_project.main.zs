@@ -2,8 +2,18 @@ import {} from "env/setup.zs";
 //import {} from "src/main.zs";
 import {} from "src/test_typeclass.zs";
 // import {} from "src/test_export.zs";
-import {} from "src/test_callable.zs";
-import {} from "src/test_module.zs";
+import { Callable } from "src/test_callable.zs";
+// import {} from "src/test_module.zs";
+
+fun import_file(file: string) {
+    import {} from file;
+}
+
+import_file("src/test_module.zs");
+
+import { exported } from "module:ExportedModule";
+
+exported();
 
 print("Hello, " + "World!");
 

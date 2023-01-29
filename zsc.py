@@ -10,10 +10,9 @@ from zs.ctrt.core import Any, Void, Unit, Type, FunctionType, Class, ClassType
 from zs.ctrt.native import NativeFunction, Boolean, String, Int64, Float64
 from zs.ctrt.objects import Core, Scope
 from zs.processing import State, StatefulProcessor
-from zs.std.importers import ZSImporter
+from zs.std.importers import ZSImporter, ModuleImporter
 from zs.std.objects.compilation_environment import ContextManager
 from zs.std.parsers import base as base_language
-from zs.std.processing.import_system import ImportResult
 from zs.std.processing.toolchain import Toolchain
 
 
@@ -92,6 +91,7 @@ def main(options: Options):
     import_system.add_directory(Path(options.source).parent.resolve())
 
     import_system.add_importer(ZSImporter(import_system, compiler), ".zs")
+    import_system.add_importer(ModuleImporter(compiler), "module")
 
     # builtins = compiler.builtins
 

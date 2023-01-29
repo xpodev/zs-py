@@ -755,6 +755,9 @@ class Scope(ScopeProtocol):
     def refer(self, name: str, value):
         self._items[name] = value
 
+    def all(self) -> list[tuple[str, ObjectProtocol]]:
+        return [(name, item) for name, item in self._members.items()]
+
 
 class ObjectImpl:
     class CallableProtocol(CallableProtocol):

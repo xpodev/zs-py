@@ -1,4 +1,4 @@
-class Callable {
+export class Callable {
     fun "_()"(this, x: string) {
         print("--- CALLABLE ---");
         print(this);

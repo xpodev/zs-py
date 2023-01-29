@@ -9,9 +9,9 @@ from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakIns
 # from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
 from zs.ctrt.native import Boolean, Int64, Float64, String
 from zs.ctrt.objects import Frame, Scope
-from zs.ctrt.protocols import DynamicScopeProtocol, ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol, BindProtocol, SetterProtocol
+from zs.ctrt.protocols import DynamicScopeProtocol, ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol, BindProtocol, SetterProtocol, ImmutableScopeProtocol
 from zs.processing import StatefulProcessor, State
-from zs.std.processing.import_system import ImportSystem, ImportResult
+from zs.std.processing.import_system import ImportSystem
 from zs.text.token import TokenType
 
 # from zs.ctrt.native import *
@@ -20,7 +20,7 @@ from zs.utils import SingletonMeta
 _GLOBAL_SCOPE = object()
 
 
-def _get_dict_from_import_result(node: nodes.Import, result: ImportResult):
+def _get_dict_from_import_result(node: nodes.Import, result: ImmutableScopeProtocol):
     res = {}
     errors = []
 
@@ -42,7 +42,7 @@ def _get_dict_from_import_result(node: nodes.Import, result: ImportResult):
                         item_name = item.expression.name
                         res[name.name] = result.item(item_name)
                     else:
-                        res[name] = result.item(name)
+                        res[name] = result.get_name(name)
                 except KeyError:
                     errors.append(f"Could not import name \"{name}\" from \"{node.source}\"")
         case _:
@@ -206,7 +206,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         if export.source is not None:
             source = self.execute(export.source)
 
-            if not isinstance(source, ImportResult):
+            if not isinstance(source, ImmutableScopeProtocol):
                 raise TypeError
 
             if isinstance(export.exported_names, nodes.Identifier):
@@ -517,14 +517,14 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         if isinstance(source, String):
             source = source.native
-            path = Path(str(source))
-            if not path.suffixes:
-                path /= f"{path.stem}.module.zs"
+            # path = Path(str(source))
+            # if not path.suffixes:
+            #     path /= f"{path.stem}.module.zs"
 
-            result = self._import_system.import_from(path)
+            result = self._import_system.import_from(source)
 
             if result is None:
-                return f"Could not import \"{path}\""
+                return f"Could not import \"{source}\""
 
             result._node = import_
 

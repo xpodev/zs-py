@@ -20,3 +20,10 @@ print(A.TFoo);
 print(module {
 
 });
+
+
+export module ExportedModule {
+    fun exported() {
+        print("Exported from module ExportedModule");
+    }
+}
