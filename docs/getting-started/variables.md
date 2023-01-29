@@ -29,7 +29,5 @@ print(my_variable); // Output: Bye!
 Since `my_variable` has a type `String`, trying to assign any other type will result
 with an error.
 ```go
-my_variable = 1;  // Error. Can't assign type `i32` to type `String`. // (1)!
+my_variable = 1;  // Error. Can't assign type `i32` to type `String`.
 ```
-
-1. Integers are not currently supported by the compiler, so it'll actually throw an internal error.

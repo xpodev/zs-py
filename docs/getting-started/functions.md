@@ -35,10 +35,8 @@ That's why we need *parameters*.
 In Z#, we can define parameters in the parameter list of the function definition.
 ```go
 fun greet(user) {
-    print("Hello " + user "!");  // (1)!
+    print("Hello " + user "!");
 }
 
 greet("Benjo"); // Output: Hello Benjo!
 ```
-
-1. The (`+`) operator is not yet supported for anything, so this will actually result with an internal error.

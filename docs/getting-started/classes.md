@@ -1,11 +1,12 @@
 # Classes
 
-When we build out program, we notice that we need to handle data, and many times, very similar data.
+When we build our program, we notice that we need to handle data, and many times, very similar data.
 
 It would be very nice for us, programmers, if we had some way to easily manage data.
 
 Fortunately, the Z# language developer does love helping others, and he came up with a way to do that.
-* *The Z# language developer did not invent classes*
+
+* *The Z# language developer did not invent classes.*
 
 To define a class we use the `class` keyword.
 ```cs
@@ -22,12 +23,9 @@ it doesn't have any data to manage.
 So we can define *fields* in a class. Defining a field in a class is as easy as defining a variable.
 ```cs
 class MyClass {
-    var my_field: String;  // (1)!
+    var my_field: String;
 }
 ```
-
-1. This will actually error, since the `String` type is not defined yet (only a placeholder).
-
 
 In order to use our class, we first need to add a constructor.
 ```fs
