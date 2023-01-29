@@ -1152,7 +1152,14 @@ class TypeClassImplementation(Class):
         _ =[*map(_bind_to_implemented_type, self._scope.members.mapping.values())]
 
 
-class Module(ScopeProtocol, DisposableProtocol):
+class ModuleType(ImmutableClassProtocol):
+    def get_name(self, name: str, instance: "Module" = None, **_) -> ObjectProtocol:
+        if not isinstance(instance, Module):
+            raise TypeError
+        return instance.get_name(name, instance=instance, **_)
+
+
+class Module(ObjectProtocol, ScopeProtocol, DisposableProtocol):
     """
     A class that represents a Z# module.
     """
@@ -1161,6 +1168,8 @@ class Module(ScopeProtocol, DisposableProtocol):
 
     name: str
     entry_point: CallableProtocol | None
+
+    runtime_type = ModuleType()
 
     def __init__(self, name: str, lexical_scope: ScopeProtocol | None, entry_point: CallableProtocol | None = None):
         self.name = name
