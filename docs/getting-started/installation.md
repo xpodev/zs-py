@@ -18,7 +18,7 @@ Add the cloned repo to your PATH.
 
 Then, create your first project:
 ```cmd
-py zsc.py new my_project
+zsc new my_project
 ```
 
 This will create a new directory `my_project` which will contain the generated project.
@@ -32,7 +32,7 @@ print("Hello, World!");
 
 Run the file:
 ```
-py zsc.py c my_project.main.zs
+zsc c my_project.main.zs
 ```
 
 Expected output:
