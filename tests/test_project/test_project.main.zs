@@ -94,3 +94,5 @@ fun test_tcls(inst: TCls, value: any) {
 
 test_tcls(FooCls("asd"), "hello");
 test_tcls(void, "VOID!");
+
+import_file("src/test_closure.zs");
