@@ -24,16 +24,48 @@ def init(options: InitOptions):
     env_dir.mkdir()
 
     with (env_dir / "setup-env.zs").open("w") as setup_env:
-        ...
+        setup_env.write("""import {
+    Void,
+    Unit,
+    Any,
+    Type,
+
+    Boolean,
+    String,
+    Int64,
+    Float64,
+
+    print,
+} from "module:core";
+
+set void = Void;
+set unit = Unit;
+set any = Any;
+set type = Type;
+
+set bool = Boolean;
+set string = String;
+set i64 = Int64;
+set f64 = Float64;
+
+set print = print;
+""")
 
     with (project_dir / f"{name}.main.zs").open("w") as project_file:
         project_file.write('\n'.join([
-            "import \"env/setup-env.zs\";",
-            "import \"src/main.zs\";", ''
+            "import {} from \"env/setup-env.zs\";",
+            f"import {{ {name} }} from \"src/main.zs\";", '',
+            f"// here we'll import the compiler and compile the {name} module.", ''
         ]))
 
     with (source_dir / "main.zs").open("w") as main_file:
-        ...
+        main_file.write('\n'.join([
+            f"export module {name} {{", ''
+            f"}}", '',
+            f"{name}.entry_point = fun() {{",
+            "\tprint(\"Hello, World!\");",
+            f"}};", ''
+        ]))
 
     with (project_dir / "readme.md").open("w") as readme_file:
         readme_file.write('\n'.join([
