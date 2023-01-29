@@ -7,7 +7,7 @@ import typing
 from functools import partial
 from typing import Callable
 
-from .core import Class, CallableAndBindProtocol, FunctionType, Any, Type, Unit
+from .core import Class, CallableAndBindProtocol, FunctionType, Any, Type, Unit, OverloadGroup
 from .protocols import *
 from .protocols import ObjectProtocol
 
@@ -23,7 +23,8 @@ class _NativeClassMeta(type, Class):
                 base = b
         Class.__init__(cls, name, base, None, None)
         for name, item in namespace.items():
-            if getattr(item, "__zs_native_function__", False):
+            # if getattr(item, "__zs_native_function__", False):
+            if isinstance(item, NativeFn):
                 item = py_function_to_zs_function(name, item, {
                     _Self: cls,
                     inspect.Signature.empty: Any
@@ -31,6 +32,9 @@ class _NativeClassMeta(type, Class):
                 name = item.name
             if not isinstance(item, ObjectProtocol):
                 continue
+            if isinstance(item, OverloadGroup):
+                for overload in item.overloads:
+                    cls.define_method(name, overload)
             if isinstance(item, NativeFunction):
                 cls.define_method(name, item)
             elif isinstance(item, NativeField):
@@ -42,11 +46,24 @@ class _NativeClassMeta(type, Class):
 
         cls.type = cls.runtime_type
 
-    # def get_name(self, name: str, instance: "Class | Class._Instance" = None) -> ObjectProtocol:
-    #     return super().get_name(name, instance=instance)
+
+class NativeFn:
+    def __init__(self, fn, name: str):
+        self.name = name
+        self.overloads = [fn]
+
+    def overload(self, fn):
+        self.overloads.append(fn)
 
 
 def py_function_to_zs_function(name, fn, transform: dict = None):
+    if isinstance(fn, NativeFn):
+        name = fn.name or name
+        overloads = list(map(lambda o: py_function_to_zs_function(name, o, transform), fn.overloads))
+        group = OverloadGroup(None, *overloads)
+        group.name = name
+        return group
+
     if not callable(fn):
         raise TypeError
     if transform is None:
@@ -65,7 +82,19 @@ def py_function_to_zs_function(name, fn, transform: dict = None):
     else:
         return_type = sig.return_annotation
     fn_type = FunctionType(types, return_type)
-    return NativeFunction(fn, fn_type, getattr(fn, "__zs_native_name__", name))
+
+    def wrapper(*args, **kwargs):
+        nonlocal return_type
+
+        result = fn(*args, **kwargs)
+        if not isinstance(result, ObjectProtocol) or not result.is_instance_of(return_type):
+            try:
+                return return_type(result)
+            except TypeError:
+                return return_type.default()
+        return result
+
+    return NativeFunction(wrapper, fn_type, getattr(fn, "__zs_native_name__", name))
 
 
 class NativeClass(ObjectProtocol, metaclass=_NativeClassMeta):
@@ -162,10 +191,11 @@ def native_fn(name_or_fn: str | Callable = None):
     def wrapper(fn):
         if not callable(fn):
             raise TypeError
-        fn.__zs_native_function__ = True
-        if name_or_fn:
-            fn.__zs_native_name__ = name_or_fn
-        return fn
+        # fn.__zs_native_function__ = True
+        # if name_or_fn:
+        #     fn.__zs_native_name__ = name_or_fn
+        # return fn
+        return NativeFn(fn, name_or_fn)
 
     if callable(name_or_fn):
         fn_ = name_or_fn
@@ -212,7 +242,7 @@ class String(NativeValue[str]):
         return cls("")
 
     @native_fn("_+_")
-    def __add__(self: _Self, right: _Self):
+    def __add__(self: _Self, right: _Self) -> _Self:
         return String(self.native + right.native)
 
     @native_fn("length")
@@ -224,15 +254,34 @@ class Character(NativeValue[str]):
     @classmethod
     def default(cls):
         return cls('\0')
+
     @native_fn("_+_")
     def __add__(self: _Self, other: String) -> String:
         return self.native + other.native
+
+    @__add__.overload
+    def _(self: _Self, other: _Self) -> String:
+        return self.native + other.native
+
+    @__add__.overload
+    def _(self: String, other: _Self) -> String:
+        return self.native + other.native
+
+
 class Int64(NativeValue[int]):
     @native_fn("_+_")
     def __add__(self: _Self, right: _Self):
         if not isinstance(right, Int64):
             raise TypeError
         return Int64(self.native + right.native)
+
+    @__add__.overload
+    def _(self: _Self, other: Character) -> Character:
+        return chr(ord(other.native) + self.native)
+
+    @__add__.overload
+    def _(self: Character, other: _Self) -> Character:
+        return chr(other.native + ord(self.native))
 
     @classmethod
     def default(cls):
