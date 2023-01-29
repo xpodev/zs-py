@@ -937,7 +937,7 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
         self._scope = Scope(lexical_scope)
 
         self.constructor = OverloadGroup(None)
-        self.type = self.runtime_type = metaclass or ClassType
+        self.runtime_type = metaclass or ClassType
 
         self._instance_factory = self._Instance
 

@@ -5,7 +5,7 @@ import {} from "src/test_typeclass.zs";
 import {} from "src/test_callable.zs";
 import {} from "src/test_module.zs";
 
-print("Hello, World!");
+print("Hello, " + "World!");
 
 fun foo() {
     print("blah");

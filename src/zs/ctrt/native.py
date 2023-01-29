@@ -23,40 +23,49 @@ class _NativeClassMeta(type, Class):
                 base = b
         Class.__init__(cls, name, base, None, None)
         for name, item in namespace.items():
-            if not isinstance(item, ObjectProtocol):
-                continue
             if getattr(item, "__zs_native_function__", False):
                 if not callable(item):
                     raise TypeError
                 sig = inspect.signature(item)
                 types = []
-                for name, parameter in sig.parameters.items():
-                    type = parameter.annotation
-                    if type is _Self:
-                        type = cls
-                    if not isinstance(parameter, TypeProtocol):
+                for parameter in sig.parameters.values():
+                    annotation = parameter.annotation
+                    if annotation is sig.empty:
+                        annotation = Any
+                    if annotation is _Self:
+                        annotation = cls
+                    if not isinstance(annotation, TypeProtocol):
                         raise TypeError(f"Native function must only have Z# types as parameters")
-                    types.append(type)
+                    types.append(annotation)
                 return_type = sig.return_annotation if sig.return_annotation is not sig.empty else Any
                 fn_type = FunctionType(types, return_type)
-                item = NativeFunction(item, fn_type, getattr(item, "__zs_native_name__", name))
+                name = getattr(item, "__zs_native_name__", name)
+                item = NativeFunction(item, fn_type, name)
+            if not isinstance(item, ObjectProtocol):
+                continue
             if isinstance(item, NativeFunction):
                 cls.define_method(name, item)
-            if isinstance(item, NativeField):
+            elif isinstance(item, NativeField):
                 cls.define_field(name, item.type, item.value)
-            if isinstance(item, Class):
+            elif isinstance(item, Class):
                 cls.define_class(name, item)
-            if isinstance(item, NativeConstructor):
+            elif isinstance(item, NativeConstructor):
                 cls.define_constructor(item.function)
+
+        cls.type = cls.runtime_type
+
+    # def get_name(self, name: str, instance: "Class | Class._Instance" = None) -> ObjectProtocol:
+    #     return super().get_name(name, instance=instance)
 
 
 class NativeClass(ObjectProtocol, metaclass=_NativeClassMeta):
-    ...
+    def __init__(self):
+        self.type = self.runtime_type = type(self)
 
 
 _T = typing.TypeVar("_T")
 _U = typing.TypeVar("_U")
-_Self = typing.TypeVar
+_Self = typing.TypeVar("_Self")
 
 
 class NativeField:
@@ -145,8 +154,8 @@ def native_fn(name_or_fn: str | Callable = None):
             raise TypeError
         fn.__zs_native_function__ = True
         if name_or_fn:
-            fn.__zs_native_name = name_or_fn
-        return
+            fn.__zs_native_name__ = name_or_fn
+        return fn
 
     if callable(name_or_fn):
         fn_ = name_or_fn
