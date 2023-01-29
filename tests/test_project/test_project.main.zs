@@ -103,3 +103,21 @@ import_file("src/test_closure.zs");
 var asd = (1 + 2) + 3;
 print("asd");
 print(asd);
+
+
+class Blah {
+    fun do(this) {
+        export var blah_x = 4;
+
+        print(blah_x);
+        this.blah_x = blah_x;
+    }
+
+    fun do2(this) {
+        print(this.blah_x);
+    }
+}
+
+var blah = Blah();
+blah.do();
+blah.do2();
