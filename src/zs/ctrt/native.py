@@ -220,6 +220,13 @@ class String(NativeValue[str]):
         return Int64(len(self.native))
 
 
+class Character(NativeValue[str]):
+    @classmethod
+    def default(cls):
+        return cls('\0')
+    @native_fn("_+_")
+    def __add__(self: _Self, other: String) -> String:
+        return self.native + other.native
 class Int64(NativeValue[int]):
     @native_fn("_+_")
     def __add__(self: _Self, right: _Self):

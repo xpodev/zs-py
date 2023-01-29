@@ -122,3 +122,5 @@ var blah = Blah();
 blah.do();
 blah.do2();
 print(Blah.do);
+
+print('a');

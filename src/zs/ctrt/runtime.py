@@ -7,7 +7,7 @@ from zs.ast import node_lib as nodes
 from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class, TypeClass, TypeClassImplementation, Module
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
 # from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
-from zs.ctrt.native import Boolean, Int64, Float64, String
+from zs.ctrt.native import Boolean, Int64, Float64, String, Character
 from zs.ctrt.objects import Frame, Scope
 from zs.ctrt.protocols import DynamicScopeProtocol, ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol, BindProtocol, SetterProtocol, ImmutableScopeProtocol
 from zs.processing import StatefulProcessor, State
@@ -343,6 +343,8 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
                 return Int64(int(value))
             case TokenType.Real:
                 return Float64(float(value))
+            case TokenType.Character:
+                return Character(value)
             case _:
                 raise TypeError(literal.token_info.literal.type)
 

@@ -48,6 +48,14 @@ def _string(parser: Parser):
     raise ParseError
 
 
+@subparser(TokenType.Character)
+@_with_default
+def _char(parser: Parser):
+    if parser.token(TokenType.Character):
+        return Literal(parser.eat(TokenType.Character))
+    raise ParseError
+
+
 @subparser(TokenType.Decimal)
 @_with_default
 def _decimal(parser: Parser):
@@ -713,6 +721,7 @@ class ExpressionParser(ContextualParser[Expression]):
     def __init__(self, state: State):
         super().__init__(state, "Expression")
 
+        self.add_parser(copy_with(_char, binding_power=0))
         self.add_parser(copy_with(_string, binding_power=0))
         self.add_parser(copy_with(_identifier, binding_power=0))
         self.add_parser(copy_with(_decimal, binding_power=0))
