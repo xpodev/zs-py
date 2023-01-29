@@ -2,6 +2,7 @@ import {} from "env/setup.zs";
 //import {} from "src/main.zs";
 import {} from "src/test_typeclass.zs";
 // import {} from "src/test_export.zs";
+import {} from "src/test_callable.zs";
 
 print("Hello, World!");
 
@@ -34,9 +35,9 @@ var x = type;
 print(x);
 
 class FooCls {
-    var x: any;
+    var x: string;
 
-    fun FooCls(this: FooCls, x) {
+    fun FooCls(this: FooCls, x: string) {
         this.x = x;
     }
 
@@ -58,7 +59,7 @@ print(f);
 foo(FooCls);
 
 typeclass TCls {
-    fun bar(x);
+    fun bar(this, x);
 }
 
 typeclass TCls(FooCls) {

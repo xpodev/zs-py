@@ -756,6 +756,19 @@ class Scope(ScopeProtocol):
         self._items[name] = value
 
 
+class ObjectImpl:
+    class CallableProtocol(CallableProtocol):
+        runtime_type: "Class"
+
+        def call(self: "Class._Instance", args: list[ObjectProtocol]) -> ObjectProtocol:
+            result = self.runtime_type.get_name("_()", instance=self)
+            if not isinstance(result, CallableProtocol):
+                raise TypeError
+            if not isinstance(result, BindProtocol):
+                return result.call([self, *args])
+            return result.bind([self]).call(args)
+
+
 class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
     class _Instance(ObjectProtocol):
         data: dict[str, ObjectProtocol]
@@ -926,19 +939,21 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
         self.constructor = OverloadGroup(None)
         self.type = self.runtime_type = metaclass or ClassType
 
+        self._instance_factory = self._Instance
+
     # @property
     # def runtime_type(self):
     #     return self.constructor.runtime_type
 
     def create_instance(self, args: list[ObjectProtocol]) -> ObjectProtocol:
-        instance = self._Instance(self)
+        instance = self._instance_factory(self)
         result = self.constructor.call([instance, *args])
         return result if result != Unit.Instance else instance
 
     def get_base(self) -> "ClassProtocol":
         return self.base
 
-    def get_name(self, name: str, instance: "Class" = None) -> ObjectProtocol:
+    def get_name(self, name: str, instance: "Class | Class._Instance" = None) -> ObjectProtocol:
         if instance is None:
             return self._scope.parent.get_name(name)
         result = self._scope.get_name(name, instance=instance)
@@ -975,6 +990,15 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
             constructor.signature.build()
             self.define_constructor(constructor)
 
+        bases = [self._Instance]
+        # check for CallableProtocol implementation
+        for method in self._methods:
+            if method.name == "_()":  # call operator
+                bases.append(ObjectImpl.CallableProtocol)
+                break
+
+        self._instance_factory = type(self.name, tuple(bases), {})
+
     # OOP Class Stuff
 
     def define_constructor(self, function: CallableProtocol):
@@ -984,11 +1008,13 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
         field = self._Field(name, self, Variable(name, type, initializer))
         field.is_instance = True
         self._scope.define(name, field)
+        self._fields.append(field)
 
     def define_method(self, name: str, function: CallableAndBindProtocol):
         method = self._Method(name, self, function)
         method.is_instance = True
         self._scope.define(name, method)
+        self._methods.append(method)
 
     def define_class(self, name: str, class_: ClassProtocol):
         ...

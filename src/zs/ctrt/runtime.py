@@ -403,7 +403,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         for method in type_class._methods:
             try:
-                impl = implementation.get_name(method.name)
+                impl = implementation.get_name(method.name, implementation)
                 #
                 # if isinstance(impl, FunctionGroup._BoundFunctionGroup):
                 #     impl = impl.group
