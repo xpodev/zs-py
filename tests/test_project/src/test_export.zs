@@ -9,3 +9,5 @@ export class {} as CLS;
 
 class Foo {}
 export Foo;
+
+export module SomeModule {} as some_module;
