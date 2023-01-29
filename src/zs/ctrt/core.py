@@ -913,6 +913,8 @@ class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
                 return self
             instance = args[0]
             if self.is_instance:
+                if isinstance(instance, Class) and instance.is_subclass_of(self.owner):
+                    return self
                 if not instance.is_instance_of(self.owner):
                     raise TypeError(f"Can only bind method '{self.owner}.{self.name}' to an instance of the owning class '{self.owner}'")
                 return self.original.bind(args)
