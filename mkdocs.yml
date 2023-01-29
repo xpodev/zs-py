@@ -145,5 +145,6 @@ nav:
     - Variables: getting-started/variables.md
     - Functions: getting-started/functions.md
     - Classes: getting-started/classes.md
+    - Typeclasses: getting-started/typeclasses.md
   - Reference:
     - reference/index.md
