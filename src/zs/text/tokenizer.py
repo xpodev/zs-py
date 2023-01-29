@@ -140,7 +140,7 @@ class Tokenizer(StatefulProcessor):
         if char == '\\':
             char += self._stream.read(1)
         if self._stream.peek() != '\'':
-            self.state.error(None, f"Expected end of character literal ({self._stream.position})")
+            self.state.error(f"Expected end of character literal ({self._stream.position})", self._stream.position)
         self._stream.read(1)
         return self._token(TokenType.Character, char)
 
