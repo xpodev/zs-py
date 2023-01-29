@@ -179,8 +179,12 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             left_srf = self.execute(left)
             right_srf = self.execute(right)
 
-        op_fn = self.do_get_member(left_srf, left, f"_{binary.token_info.operator.value}_")
-        return self.do_function_call(op_fn, [right])
+        try:
+            op_fn = self.do_get_member(left_srf, left, f"_{binary.token_info.operator.value}_")
+            return self.do_function_call(op_fn, [right])
+        except TypeError:
+            op_fn = self.do_get_member(right_srf, right, f"_{binary.token_info.operator.value}_")
+            return self.do_function_call(op_fn, [left])
 
     @_exec
     def _(self, block: nodes.Block):

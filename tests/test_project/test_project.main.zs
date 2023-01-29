@@ -124,3 +124,10 @@ blah.do2();
 print(Blah.do);
 
 print('a');
+print('a' + 'b');
+print('a' + "bc");
+
+print("ab" + 'c');
+
+print(5 + 'a');
+print('a' + 5);
