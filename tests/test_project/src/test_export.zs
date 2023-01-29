@@ -11,3 +11,6 @@ class Foo {}
 export Foo;
 
 export module SomeModule {} as some_module;
+export fun func2() {}
+
+print("a", "b");

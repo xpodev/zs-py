@@ -27,6 +27,14 @@ core.define("Unit", Unit)
 # core.define("Class", Class)  # srf
 
 
-@define_function("print")
-def core__print(value: Any) -> None:
-    print(value)
+define_print = define_function("print")
+
+
+@define_print
+def core__print(arg1: Any) -> None:
+    print(arg1)
+
+
+@define_print
+def core__print(arg1: Any, arg2: Any) -> None:
+    print(arg1, arg2)

@@ -587,6 +587,10 @@ class Function(CallableAndBindProtocol):
         return self._signature
 
     @property
+    def name(self):
+        return self.signature.name
+
+    @property
     def runtime_type(self):
         return self.signature.runtime_type
 
@@ -705,10 +709,11 @@ class Scope(ScopeProtocol):
                     raise NameAlreadyExistsError(key, self._owner, self)
                 if isinstance(original, OverloadGroup):
                     if isinstance(value, OverloadGroup):
-                        original.overloads.extend(value.overloads)
+                        group = OverloadGroup(original.parent, *original.overloads, *value.overloads)
                     else:
-                        original.add_overload(value)
-                    return original.build()
+                        group = OverloadGroup(original.parent, *original.overloads, value)
+                    self._items[key] = group
+                    return group.build()
 
                 value = OverloadGroup(_get_overload_group_parent(), original, value)
             self._items[key] = value
