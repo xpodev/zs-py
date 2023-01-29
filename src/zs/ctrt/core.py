@@ -1094,6 +1094,8 @@ class TypeClass(Class):
         return source in self._implementations
 
     def get_name(self, name: str, instance: ObjectProtocol = None):
+        if instance is None:
+            return super().get_name(name)
         try:
             return self._implementations[instance.runtime_type].implementation.get_name(name, instance)
         except KeyError:

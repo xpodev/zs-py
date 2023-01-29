@@ -45,3 +45,17 @@ fun do_print(x: IPrint)
 // do_print(Foo());
 do_print(45);
 do_print(3.14);
+
+
+typeclass MyTypeclass {
+    fun my_api(this: string, value: string);
+}
+
+typeclass MyTypeclass(string) {
+    fun my_api(this: string, value: string) {
+        print("Typeclass.my_api(string, string) is implemented on string! " + this + value);
+    }
+}
+
+var my_typeclass: MyTypeclass = "Hello";
+my_typeclass.my_api(", Typeclasses!");
