@@ -99,3 +99,7 @@ test_tcls(FooCls("asd"), "hello");
 test_tcls(void, "VOID!");
 
 import_file("src/test_closure.zs");
+
+var asd = (1 + 2) + 3;
+print("asd");
+print(asd);

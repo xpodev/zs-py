@@ -189,6 +189,30 @@ def parse_block(parser: Parser) -> Block:
     return Block(_left_bracket, statements, _right_bracket)
 
 
+@subparser('(')
+def parse_parenthesised_expression_or_tuple(parser: Parser) -> Expression:
+    _left_parenthesis = parser.eat('(')
+
+    expressions = []
+
+    is_tuple = False
+    while not parser.token(')'):
+        expressions.append(parser.next("Expression"))
+
+        if parser.token(',', eat=True):
+            is_tuple = True
+
+    _right_parenthesis = parser.eat(')')
+
+    if is_tuple:
+        raise ValueError("Tuples are not yet supported")
+    else:
+        if len(expressions) != 1:
+            raise ValueError("???")
+
+        return expressions[0]
+
+
 # statements
 
 
@@ -695,7 +719,7 @@ class ExpressionParser(ContextualParser[Expression]):
         self.add_parser(copy_with(_real, binding_power=0))
 
         self.add_parser(SubParser(
-            100, '(', led=parse_function_call
+            100, '(', led=parse_function_call, nud=parse_parenthesised_expression_or_tuple
         ))
         self.add_parser(SubParser(
             120, '.', led=parse_member_access
