@@ -420,47 +420,6 @@ class OverloadGroup(CallableAndBindProtocol):
         ...
 
 
-# class FunctionGroup(NativeObject, BindProtocol):
-#     name: str
-#     _overloads: list[Function]
-#
-#     class _BoundFunctionGroup(NativeObject, CallableProtocol):
-#         group: "FunctionGroup"
-#         args: list[ObjectProtocol]
-#
-#         def __init__(self, group: "FunctionGroup", args: list[ObjectProtocol]):
-#             super().__init__()
-#             self.group = group
-#             self.args = args
-#
-#         def get_matching_overloads(self, args: list[ObjectProtocol]):
-#             return [
-#                 item.bind(self.args) if isinstance(item, BindProtocol) else item for item in self.group.get_matching_overloads(self.args + args)
-#             ]
-#
-#         def call(self, args: list[ObjectProtocol]):
-#             overloads = self.get_matching_overloads(args)
-#
-#             if not len(overloads):
-#                 raise TypeError
-#             if len(overloads) > 1:
-#                 raise TypeError
-#             return overloads[0].call(self.args + args)
-#
-#     def __init__(self, name: str, *fns: Function):
-#         super().__init__()
-#         self.name = name
-#         self._overloads = list(fns)
-#         self.runtime_type = self._FunctionGroupType(self)
-#
-#     @property
-#     def overloads(self):
-#         return self._overloads.copy()
-#
-#     def bind(self, args: list[ObjectProtocol]):
-#         return self._BoundFunctionGroup(self, args)
-
-
 @dataclass(slots=True)
 class Parameter:
     _owner: "FunctionSignature"
