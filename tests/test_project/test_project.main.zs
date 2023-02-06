@@ -71,6 +71,8 @@ var f = FooCls("hello");
 f.print_x();
 print(f);
 
+print("typeof({}) =", typeof(f));
+
 foo(FooCls);
 
 typeclass TCls {

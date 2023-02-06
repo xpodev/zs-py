@@ -12,6 +12,10 @@ import {
     print,
 } from "module:core";
 
+import {
+    typeof
+} from "module:srf";
+
 set void = Void;
 set unit = Unit;
 set any = Any;
@@ -23,3 +27,5 @@ set i64 = Int64;
 set f64 = Float64;
 
 set print = print;
+
+set typeof = typeof;

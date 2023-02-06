@@ -8,6 +8,7 @@ from zs.ctrt.objects import Core, Scope
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter, ModuleImporter
 from zs.std.modules.module_core import core
+from zs.std.modules.module_srf import srf
 from zs.std.objects.compilation_environment import ContextManager
 from zs.std.parsers import base as base_language
 from zs.std.processing.toolchain import Toolchain
@@ -67,6 +68,7 @@ def main(options: Options):
     import_system.add_importer(ModuleImporter(compiler), "module")
 
     compiler.context.add_module_to_cache("core", core)
+    compiler.context.add_module_to_cache("srf", srf)
 
     try:
         compiler.compile(options.source)
