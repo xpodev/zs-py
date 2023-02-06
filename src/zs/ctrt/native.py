@@ -87,7 +87,7 @@ def py_function_to_zs_function(name, fn, transform: dict = None):
         nonlocal return_type
 
         result = fn(*args, **kwargs)
-        if not isinstance(result, ObjectProtocol) or not result.is_instance_of(return_type):
+        if not isinstance(result, ObjectProtocol) or not return_type.is_instance(result):
             try:
                 return return_type(result)
             except TypeError:

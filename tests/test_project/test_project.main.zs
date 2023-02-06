@@ -3,6 +3,7 @@ print(i64);
 //import {} from "src/main.zs";
 import {} from "src/test_typeclass.zs";
 import {} from "src/test_export.zs";
+//import {} from "src/test_type_parameters.zs";
 
 import {} from "module:some_module";
 
@@ -72,6 +73,7 @@ f.print_x();
 print(f);
 
 print("typeof({}) =", typeof(f));
+print(typeof(5));
 
 foo(FooCls);
 
