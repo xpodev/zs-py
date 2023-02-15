@@ -127,8 +127,8 @@ class NativeFunction(CallableAndBindProtocol):
             self.name = ''
         self.runtime_type = type
 
-    def call(self, args: list[ObjectProtocol]):
-        return self.invoke(*args)
+    def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
+        return self.invoke(*args, **kwargs)
 
     def invoke(self, *args, **kwargs):
         return self._native(*args, **kwargs)

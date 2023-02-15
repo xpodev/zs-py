@@ -110,7 +110,7 @@ class ScopeProtocol:
 class CallableProtocol(ObjectProtocol):
     runtime_type: "CallableTypeProtocol"
 
-    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+    def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
         """
         Apply actual values to the object.
         """

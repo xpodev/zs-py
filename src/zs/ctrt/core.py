@@ -303,8 +303,8 @@ class CallableAndBindProtocol(CallableProtocol, BindProtocol):
 
 
 class DefaultCallableProtocol(CallableAndBindProtocol):
-    def bind(self, args: list[ObjectProtocol]):
-        return _PartialCallImpl(self, args)
+    def bind(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
+        return _PartialCallImpl(self, args, kwargs)
 
 
 class _PartialCallImpl(DefaultCallableProtocol):
@@ -322,9 +322,10 @@ class _PartialCallImpl(DefaultCallableProtocol):
         def compare_type_signature(self, other: "CallableProtocol") -> bool:
             return other.runtime_type.compare_type_signature(self.origin)
 
-    def __init__(self, callable_: CallableProtocol, args: list[ObjectProtocol], type: CallableTypeProtocol):
+    def __init__(self, callable_: CallableProtocol, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol], type: CallableTypeProtocol):
         self.callable = callable_
         self.args = args
+        self.kwargs = kwargs
         # self.runtime_type = self._PartialCallImplType(self.get_bound_argument_types(), self.callable.runtime_type)
         self.runtime_type = type
 
@@ -337,8 +338,8 @@ class _PartialCallImpl(DefaultCallableProtocol):
     def compare_type_signature(self, other: "CallableTypeProtocol") -> bool:
         return other.compare_type_signature(self.runtime_type)
 
-    def call(self, args: list[ObjectProtocol]):
-        return self.callable.call(self.args + args)
+    def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
+        return self.callable.call(self.args + args, {**self.kwargs, **kwargs})
 
 
 class OverloadGroupType(CallableTypeProtocol):
@@ -393,7 +394,7 @@ class OverloadGroup(CallableAndBindProtocol):
             return self.parent.get_matching_overloads_for_types(types)
         return result
 
-    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+    def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
         overloads = self.get_matching_overloads(args)
 
         if not overloads:
@@ -401,7 +402,7 @@ class OverloadGroup(CallableAndBindProtocol):
         if len(overloads) > 1:
             raise TypeError
 
-        return overloads[0].call(args)
+        return overloads[0].call(args, kwargs)
 
     def bind(self, args: list[ObjectProtocol]):
         result = []
@@ -552,11 +553,13 @@ class Function(CallableAndBindProtocol):
     def runtime_type(self):
         return self.signature.runtime_type
 
-    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+    def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
         if not self.runtime_type.get_type_of_call(list(map(lambda arg: arg.runtime_type, args))).assignable_to(self.signature.return_type):
             raise TypeError
 
         runtime = get_runtime()
+
+        # todo: match arguments with parameters
 
         with runtime.x.frame(self):
             for parameter, argument in zip(self.signature.parameters, args):
@@ -573,13 +576,13 @@ class Function(CallableAndBindProtocol):
             except ReturnInstructionInvoked as e:
                 return e.value
 
-    def bind(self, args: list[ObjectProtocol]):
+    def bind(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
         if len(args) > len(self.signature.parameters):
             raise TypeError
         for arg, parameter in zip(args, self.signature.parameters):
             if not arg.is_instance_of(parameter.type):
                 raise TypeError
-        return _PartialCallImpl(self, args, FunctionType(list(map(lambda p: p.type, self.signature.parameters[len(args):])), self.signature.return_type))
+        return _PartialCallImpl(self, args, kwargs, FunctionType(list(map(lambda p: p.type, self.signature.parameters[len(args):])), self.signature.return_type))
 
 
 class _ObjectType(ClassProtocol, metaclass=SingletonMeta):
@@ -596,7 +599,7 @@ class _ObjectType(ClassProtocol, metaclass=SingletonMeta):
     def is_subclass_of(self, base: "ClassProtocol") -> bool:
         return False
 
-    def create_instance(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+    def create_instance(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
         if len(args):
             raise TypeError(f"'object type' constructor may not be called with arguments.")
 
@@ -732,12 +735,12 @@ class ObjectImpl:
     class CallableProtocol(CallableProtocol):
         runtime_type: "Class"
 
-        def call(self: "Class._Instance", args: list[ObjectProtocol]) -> ObjectProtocol:
+        def call(self: "Class._Instance", args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
             result = self.runtime_type.get_name("_()", instance=self)
             if not isinstance(result, CallableProtocol):
                 raise TypeError
             if not isinstance(result, BindProtocol):
-                return result.call([self, *args])
+                return result.call([self, *args], kwargs)
             return result.bind([self]).call(args)
 
 
@@ -866,8 +869,8 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
         def runtime_type(self):
             return self.original.runtime_type
 
-        def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
-            return self.bind(args).call([])
+        def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
+            return self.bind(args).call([], kwargs)
 
         def bind(self, args: list[ObjectProtocol]):
             if self.is_static:
@@ -894,7 +897,6 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
     _fields: list[_Field]
     _methods: list[_Method]
 
-    _items: dict[str, typing.Union[_Field, _Method, "Class"]]
     _scope: Scope
 
     data: dict[str, Variable]  # static fields
@@ -907,17 +909,12 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
         self._methods = []
         self.data = {}
 
-        self._items = {}
         self._scope = Scope(lexical_scope)
 
         self.constructor = OverloadGroup(None)
         self.runtime_type = metaclass or ClassType
 
         self._instance_factory = self._Instance
-
-    # @property
-    # def runtime_type(self):
-    #     return self.constructor.runtime_type
 
     def create_instance(self, args: list[ObjectProtocol]) -> ObjectProtocol:
         instance = self._instance_factory(self)
@@ -935,7 +932,7 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
         return result
 
     def all(self) -> list[tuple[str, ObjectProtocol]]:
-        return [(name, item) for name, item in self._items.items()]
+        return self._scope.all()
 
     def define(self, name: str, value: ObjectProtocol):
         match value:
@@ -996,7 +993,7 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
     # End OOP Class Stuff
 
     def __repr__(self):
-        return f"<Z# Class {self.name}>"
+        return f"<Z# Class {self.name if self.name else '{Anonymous}'}>"
 
 
 class _ClassType(Class, CallableTypeProtocol, metaclass=SingletonMeta):
@@ -1075,7 +1072,7 @@ class TypeClass(Class):
         except KeyError:
             raise TypeError(f"type {instance.runtime_type} does not implement typeclass {self.name}")
 
-    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+    def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
         if len(args) != 1:
             raise TypeError(f"Parameterized typeclasses are not yet implemented")
         type = args[0]
@@ -1112,7 +1109,7 @@ class TypeClassImplementation(Class):
                 for overload in member.overloads:
                     _bind_to_implemented_type(overload)
 
-        _ =[*map(_bind_to_implemented_type, self._scope.members.mapping.values())]
+        _ = [*map(_bind_to_implemented_type, self._scope.members.mapping.values())]
 
 
 class ModuleType(ScopeProtocol):
