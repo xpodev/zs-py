@@ -391,7 +391,7 @@ class Tuple(Expression[token_info.Tuple]):
     """
     AST node for a tuple
 
-    '(' EXPRESSIONS ')'
+    '(' EXPRESSIONS, ... ')'
     """
 
     items: list[Expression]
