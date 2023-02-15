@@ -516,18 +516,18 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     def _(self, while_: nodes.While):
         with self.x.scope():
             if while_.name:
-                while_wrapper = WhileWrapper(while_)
+                while_wrapper = while_
                 self.x.current_scope.define(while_.name.name, while_wrapper)
 
             while self.execute(while_.condition):
                 try:
                     self.execute(while_.body)
                 except BreakInstructionInvoked as e:
-                    if e.loop is None or e.loop.node is while_:
+                    if e.loop is None or e.loop is while_:
                         break
                     raise
                 except ContinueInstructionInvoked as e:
-                    if e.loop is None or e.loop.node is while_:
+                    if e.loop is None or e.loop is while_:
                         continue
                     raise
             else:
