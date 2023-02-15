@@ -1,12 +1,12 @@
 from pathlib import Path
 from typing import Iterable
 
-from zs.ctrt.objects import Scope
-from zs.ctrt.protocols import ObjectProtocol, ImmutableScopeProtocol
+from zs.ctrt.core import Scope
+from zs.ctrt.protocols import ObjectProtocol, ScopeProtocol
 from zs.std.processing.import_system import Importer, ImportSystem
 
 
-class ZSImportResult(ImmutableScopeProtocol):
+class ZSImportResult(ScopeProtocol):
     _scope: Scope
     _items: dict[str, ObjectProtocol]
 
@@ -31,10 +31,10 @@ class ZSImporter(Importer):
         self._import_system = import_system
         self._compiler = compiler
 
-    def import_from(self, source: str) -> ImmutableScopeProtocol | None:
+    def import_from(self, source: str) -> ScopeProtocol | None:
         return self.import_file(Path(source))
 
-    def import_file(self, path: Path) -> ImmutableScopeProtocol | None:
+    def import_file(self, path: Path) -> ScopeProtocol | None:
         path = self._import_system.resolve(path)
 
         if path is None:
@@ -49,5 +49,5 @@ class ModuleImporter(Importer):
     def __init__(self, compiler):
         self._compiler = compiler
 
-    def import_from(self, source: str) -> ImmutableScopeProtocol | None:
+    def import_from(self, source: str) -> ScopeProtocol | None:
         return self._compiler.context.get_module_from_cache(source)

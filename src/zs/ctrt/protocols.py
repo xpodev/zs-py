@@ -71,9 +71,9 @@ class SetterProtocol:
         """
 
 
-class ImmutableScopeProtocol:
+class ScopeProtocol:
     """
-    Represents a scope that is read-only.
+    Represents a scope
     """
 
     def get_name(self, name: str, **_) -> ObjectProtocol:
@@ -87,12 +87,6 @@ class ImmutableScopeProtocol:
         """
         Returns a list of pairs of (name, value) of all values defined in this scope.
         """
-
-
-class DynamicScopeProtocol:
-    """
-    Represents a scope that can change size
-    """
 
     def define(self, name: str, value: ObjectProtocol):
         """
@@ -113,22 +107,6 @@ class DynamicScopeProtocol:
         """
 
 
-class ScopeProtocol(DynamicScopeProtocol, ImmutableScopeProtocol):
-    ...
-
-
-class ConstructibleTypeProtocol(TypeProtocol):
-    def create_instance(self, args: list[ObjectProtocol]) -> ObjectProtocol: ...
-
-
-class ImmutableTypeProtocol(TypeProtocol, ImmutableScopeProtocol):
-    ...
-
-
-class MutableTypeProtocol(ImmutableTypeProtocol):
-    ...
-
-
 class CallableProtocol(ObjectProtocol):
     runtime_type: "CallableTypeProtocol"
 
@@ -138,7 +116,7 @@ class CallableProtocol(ObjectProtocol):
         """
 
 
-class ClassProtocol(ConstructibleTypeProtocol, ScopeProtocol, CallableProtocol):
+class ClassProtocol(TypeProtocol, ScopeProtocol, CallableProtocol):
     def get_base(self) -> "ClassProtocol | None": ...
 
     def is_subclass_of(self, base: "ClassProtocol") -> bool:
@@ -155,16 +133,10 @@ class ClassProtocol(ConstructibleTypeProtocol, ScopeProtocol, CallableProtocol):
     def is_superclass_of(self, child: "ClassProtocol") -> bool:
         return child.is_subclass_of(self)
 
-    def call(self, args: list[ObjectProtocol]) -> ObjectProtocol:
-        return self.create_instance(args)
+    def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
+        return self.create_instance(args, kwargs)
 
-
-class ImmutableClassProtocol(ClassProtocol, ImmutableScopeProtocol):
-    ...
-
-
-class MutableClassProtocol(ClassProtocol, ImmutableScopeProtocol):
-    ...
+    def create_instance(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol: ...
 
 
 class BindProtocol:

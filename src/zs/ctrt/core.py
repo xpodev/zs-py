@@ -3,14 +3,13 @@ This module defines some core types in the Z# programming language.
 """
 import typing
 from dataclasses import dataclass
-from enum import IntFlag
 from typing import Optional
 
-from zs.ctrt import get_runtime
-from zs.ctrt.errors import MemberAlreadyDefinedError, UnknownMemberError, NoParentScopeError, NameNotFoundError, NameAlreadyExistsError, ReturnInstructionInvoked
-from zs.ctrt.protocols import ClassProtocol, TypeProtocol, ObjectProtocol, SetterProtocol, GetterProtocol, BindProtocol, CallableTypeProtocol, MutableClassProtocol, ImmutableClassProtocol, \
-    DynamicScopeProtocol, DisposableProtocol, ScopeProtocol, CallableProtocol
-from zs.utils import SingletonMeta
+from . import get_runtime
+from .errors import NameNotFoundError, NameAlreadyExistsError, ReturnInstructionInvoked
+from .protocols import ClassProtocol, TypeProtocol, ObjectProtocol, SetterProtocol, GetterProtocol, BindProtocol, CallableTypeProtocol, \
+    DisposableProtocol, ScopeProtocol, CallableProtocol
+from ..utils import SingletonMeta
 
 __all__ = [
     "Any",
@@ -742,7 +741,7 @@ class ObjectImpl:
             return result.bind([self]).call(args)
 
 
-class Class(MutableClassProtocol, DynamicScopeProtocol, DisposableProtocol):
+class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
     class _Instance(ObjectProtocol):
         data: dict[str, ObjectProtocol]
         runtime_type: "Class"
@@ -1116,7 +1115,7 @@ class TypeClassImplementation(Class):
         _ =[*map(_bind_to_implemented_type, self._scope.members.mapping.values())]
 
 
-class ModuleType(ImmutableClassProtocol):
+class ModuleType(ScopeProtocol):
     def get_name(self, name: str, instance: "Module" = None, **_) -> ObjectProtocol:
         if not isinstance(instance, Module):
             raise TypeError

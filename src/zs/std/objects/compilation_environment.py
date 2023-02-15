@@ -1,5 +1,4 @@
-from ...ctrt.core import Module
-from ...ctrt.objects import Scope
+from ...ctrt.core import Module, Scope
 
 
 class ContextManager:

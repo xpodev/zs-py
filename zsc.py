@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Callable
 
 from zs.cli.options import Options, get_options, InitOptions
-from zs.ctrt.objects import Core, Scope
+from zs.ctrt.core import Scope
 from zs.processing import State, StatefulProcessor
 from zs.std.importers import ZSImporter, ModuleImporter
 from zs.std.modules.module_core import core

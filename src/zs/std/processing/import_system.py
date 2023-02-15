@@ -1,16 +1,15 @@
 import re
 from pathlib import Path
-from typing import Iterable
 
-from zs.ctrt.protocols import ObjectProtocol, ScopeProtocol, ImmutableScopeProtocol
+from zs.ctrt.protocols import ScopeProtocol
 
 
 class Importer:
-    def import_from(self, source: str) -> ImmutableScopeProtocol | None:
+    def import_from(self, source: str) -> ScopeProtocol | None:
         ...
 
     @lambda _: None
-    def import_directory(self, path: Path) -> ImmutableScopeProtocol | None:
+    def import_directory(self, path: Path) -> ScopeProtocol | None:
         ...
 
 
@@ -50,19 +49,19 @@ class ImportSystem(Importer):
         if importer.import_directory is not None:
             self._directory_importers.append(importer)
 
-    def import_directory(self, path: Path) -> ImmutableScopeProtocol | None:
+    def import_directory(self, path: Path) -> ScopeProtocol | None:
         for importer in self._directory_importers:
             if result := importer.import_directory(path):
                 return result
         return None
 
-    def import_file(self, path: Path) -> ImmutableScopeProtocol | None:
+    def import_file(self, path: Path) -> ScopeProtocol | None:
         try:
             return self._suffix_importers[path.suffix].import_from(str(path))
         except KeyError as e:
             raise e
 
-    def import_from(self, source: str) -> ImmutableScopeProtocol | None:
+    def import_from(self, source: str) -> ScopeProtocol | None:
         if match := re.match(r"(?P<importer>[A-Za-z]+):(?P<source>.*)", source):
             groups = match.groupdict()
             return self._importers[groups["importer"]].import_from(groups["source"])

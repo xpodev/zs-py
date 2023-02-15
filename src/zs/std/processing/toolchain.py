@@ -1,8 +1,7 @@
 from pathlib import Path
 
 import zs.ctrt
-from zs.ctrt.core import Module, ExportScope
-from zs.ctrt.objects import Scope
+from zs.ctrt.core import Module, ExportScope, Scope
 from zs.ctrt.runtime import Interpreter
 from zs.processing import StatefulProcessor, State
 from zs.std.objects.compilation_environment import ContextManager

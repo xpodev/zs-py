@@ -4,12 +4,11 @@ from pathlib import Path
 
 from zs.ast.node import Node
 from zs.ast import node_lib as nodes
-from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class, TypeClass, TypeClassImplementation, Module
+from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Variable, Class, TypeClass, TypeClassImplementation, Module, Scope
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
 # from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
 from zs.ctrt.native import Boolean, Int64, Float64, String, Character
-from zs.ctrt.objects import Frame, Scope
-from zs.ctrt.protocols import DynamicScopeProtocol, ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol, BindProtocol, SetterProtocol, ImmutableScopeProtocol
+from zs.ctrt.protocols import ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol, BindProtocol, SetterProtocol, ScopeProtocol
 from zs.processing import StatefulProcessor, State
 from zs.std.processing.import_system import ImportSystem
 from zs.text.token import TokenType
@@ -20,7 +19,7 @@ from zs.utils import SingletonMeta
 _GLOBAL_SCOPE = object()
 
 
-def _get_dict_from_import_result(node: nodes.Import, result: ImmutableScopeProtocol):
+def _get_dict_from_import_result(node: nodes.Import, result: ScopeProtocol):
     res = {}
     errors = []
 
@@ -51,11 +50,23 @@ def _get_dict_from_import_result(node: nodes.Import, result: ImmutableScopeProto
     return res, errors
 
 
+class Frame(Scope):
+    _function: Function
+
+    def __init__(self, function: Function | None, parent: ScopeProtocol | None = None):
+        super().__init__(parent)
+        self._function = function
+
+    @property
+    def function(self):
+        return self._function
+
+
 class InterpreterState:
     _frame_stack: list[Frame]
     _scope: Scope
     _global_scope: Scope
-    _scope_protocol: DynamicScopeProtocol | None
+    _scope_protocol: ScopeProtocol | None
 
     def __init__(self, global_scope: Scope):
         self._frame_stack = [Frame(None, global_scope)]
@@ -75,7 +86,7 @@ class InterpreterState:
         return self._global_scope
 
     @contextmanager
-    def scope_protocol(self, scope_protocol: DynamicScopeProtocol):
+    def scope_protocol(self, scope_protocol: ScopeProtocol):
         self._scope_protocol, old = scope_protocol, self._scope_protocol
 
         try:
@@ -84,7 +95,7 @@ class InterpreterState:
             self._scope_protocol = old
 
     @contextmanager
-    def scope(self, scope: DynamicScopeProtocol = None, /, parent: Scope = None, **items: ObjectProtocol):
+    def scope(self, scope: ScopeProtocol = None, /, parent: Scope = None, **items: ObjectProtocol):
         self._scope, old = scope or Scope(parent or self._scope, **items), self._scope
         try:
             yield self._scope
