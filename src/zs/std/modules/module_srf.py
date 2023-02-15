@@ -13,5 +13,5 @@ def define_function(*args, **kwargs):
 
 
 @define_function("typeof")
-def core__typeof(instance: Any) -> Type:
+def srf__typeof(instance: Any) -> Type:
     return instance.runtime_type
