@@ -1,4 +1,4 @@
-//import { print } from Python;
+import { print } from "module:core";
 
 fun print2(value) {
     print(value);
@@ -178,11 +178,11 @@ print(y.length());
 
 
 class Number {
-    fun Number(x) {
+    fun Number(this, x) {
         this.x = x;
     }
 
-    fun "_+_"(other) {
+    fun "_+_"(this, other) {
         return Number(1 + other);
     }
 
