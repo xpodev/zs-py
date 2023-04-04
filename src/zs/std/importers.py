@@ -2,24 +2,24 @@ from pathlib import Path
 from typing import Iterable
 
 from zs.ctrt.core import Scope
-from zs.ctrt.protocols import ObjectProtocol, ScopeProtocol
+from zs.ctrt.protocols import ObjectProtocol, ScopeProtocol, TypeProtocol
 from zs.std.processing.import_system import Importer, ImportSystem
 
 
 class ZSImportResult(ScopeProtocol):
     _scope: Scope
-    _items: dict[str, ObjectProtocol]
+    _items: dict[str, tuple[TypeProtocol, ObjectProtocol]]
 
     def __init__(self, scope: Scope):
         super().__init__()
         self._scope = scope
         self._items = dict(scope.members)
 
-    def all(self) -> Iterable[tuple[str, ObjectProtocol]]:
+    def all(self) -> Iterable[tuple[str, tuple[TypeProtocol, ObjectProtocol]]]:
         for name, item in self._items.items():
             yield name, item
 
-    def get_name(self, name: str, **_) -> ObjectProtocol:
+    def get_name(self, name: str, **_) -> tuple[TypeProtocol, ObjectProtocol]:
         return self._items[name]
 
 

@@ -8,7 +8,7 @@ from zs.ctrt.core import Null, Unit, Any, Function, OverloadGroup, Object, Varia
 from zs.ctrt.errors import ReturnInstructionInvoked, NameNotFoundError, BreakInstructionInvoked, ContinueInstructionInvoked, UnknownMemberError
 # from zs.ctrt.objects import Frame, Function, Scope, Class, FunctionGroup, Variable, TypeClass, TypeClassImplementation
 from zs.ctrt.native import Boolean, Int64, Float64, String, Character
-from zs.ctrt.protocols import ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, DisposableProtocol, BindProtocol, SetterProtocol, ScopeProtocol
+from zs.ctrt.protocols import ObjectProtocol, CallableProtocol, GetterProtocol, TypeProtocol, BindProtocol, SetterProtocol, ScopeProtocol
 from zs.processing import StatefulProcessor, State
 from zs.std.processing.import_system import ImportSystem
 from zs.text.token import TokenType
@@ -86,22 +86,12 @@ class InterpreterState:
         return self._global_scope
 
     @contextmanager
-    def scope_protocol(self, scope_protocol: ScopeProtocol):
-        self._scope_protocol, old = scope_protocol, self._scope_protocol
-
-        try:
-            yield
-        finally:
-            self._scope_protocol = old
-
-    @contextmanager
     def scope(self, scope: ScopeProtocol = None, /, parent: Scope = None, **items: ObjectProtocol):
         self._scope, old = scope or Scope(parent or self._scope, **items), self._scope
         try:
             yield self._scope
         finally:
-            if isinstance(self._scope, DisposableProtocol):
-                self._scope.dispose()
+            self._scope.on_exit()
             self._scope = old
 
     @contextmanager
@@ -111,9 +101,7 @@ class InterpreterState:
         try:
             yield
         finally:
-            frame = self._frame_stack.pop()
-            if isinstance(frame, DisposableProtocol):
-                frame.dispose()
+            self._frame_stack.pop().on_exit()
             self._scope = scope
 
 
@@ -192,10 +180,10 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         try:
             op_fn = self.do_get_member(left_srf, left, f"_{binary.token_info.operator.value}_")
-            return self.do_function_call(op_fn, [right])
+            return self.do_function_call(op_fn, [right], {})
         except TypeError:
             op_fn = self.do_get_member(right_srf, right, f"_{binary.token_info.operator.value}_")
-            return self.do_function_call(op_fn, [left])
+            return self.do_function_call(op_fn, [left], {})
 
     @_exec
     def _(self, block: nodes.Block):
@@ -221,7 +209,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         if export.source is not None:
             source = self.execute(export.source)
 
-            if not isinstance(source, ImmutableScopeProtocol):
+            if not isinstance(source, ScopeProtocol):
                 raise TypeError
 
             if isinstance(export.exported_names, nodes.Identifier):
@@ -233,7 +221,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
             elif isinstance(export.exported_names, list):
                 for item in export.exported_names:
                     if isinstance(item, nodes.Identifier):
-                        target_scope.refer(item.name, source.item(item.name))
+                        target_scope.refer(item.name, source.get_name(item.name))
                     elif isinstance(item, nodes.Alias):
                         if not isinstance(item.expression, nodes.Identifier):
                             raise TypeError
@@ -254,7 +242,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
                 name = getattr(exported_item, "name", None)
                 if not name:
                     raise ValueError
-            target_scope.define(name, exported_item)
+            target_scope.define(name, exported_item, exported_item)
 
     @_exec
     def _(self, expression_statement: nodes.ExpressionStatement):
@@ -267,12 +255,16 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
         # is function really a function?
 
         arguments = list(map(self.execute, call.arguments))
+        keyword_arguments = {
+            name: self.execute(value)
+            for name, value in call.keyword_arguments.items()
+        }
 
         # did we successfully evaluate the arguments?
 
         # can we unpack the arguments into the function parameters without any errors? I guess we should try...
 
-        return self.do_function_call(function, arguments)
+        return self.do_function_call(function, arguments, keyword_arguments)
 
     @_exec
     def _(self, function: nodes.Function):
@@ -404,7 +396,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         self.x.current_scope.define(type_class.name, type_class)
 
-        with self.x.scope(type_class), self.x.scope_protocol(type_class):
+        with self.x.scope(type_class):
             for item in tc.items:
                 self.execute(item)
 
@@ -479,7 +471,7 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
 
         name = var.name.name.name
         variable = Variable(name, var_type, initializer)
-        self.x.current_scope.define(name, variable)
+        self.x.current_scope.define(name, variable, variable)
 
         return variable
 
@@ -557,19 +549,19 @@ class Interpreter(StatefulProcessor, metaclass=SingletonMeta):
     # runtime implementation functions
 
     @staticmethod
-    def do_function_call(function: CallableProtocol, arguments: list[ObjectProtocol]) -> ObjectProtocol:
+    def do_function_call(function: CallableProtocol, arguments: list[ObjectProtocol], keyword_arguments: dict[str, ObjectProtocol]) -> ObjectProtocol:
         if not isinstance(function, CallableProtocol):
             raise TypeError(f"'function' must implement the callable protocol")
 
-        return function.call(arguments)
+        return function.call(arguments, keyword_arguments)
 
     def do_get_member(self, obj_srf, obj: ObjectProtocol, name: str):
         try:
             member = obj_srf.type.get_name(name, instance=obj)
         except AttributeError:
-            member = obj_srf.get_name(name, instance=obj)
+            member = obj_srf.runtime_type.get_name(name, instance=obj)
         if isinstance(member, BindProtocol):
-            member = member.bind([obj])
+            member = member.bind([obj], {})
         if self._srf_access:
             return member
         if isinstance(member, GetterProtocol):

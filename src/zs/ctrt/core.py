@@ -7,8 +7,7 @@ from typing import Optional
 
 from . import get_runtime
 from .errors import NameNotFoundError, NameAlreadyExistsError, ReturnInstructionInvoked
-from .protocols import ClassProtocol, TypeProtocol, ObjectProtocol, SetterProtocol, GetterProtocol, BindProtocol, CallableTypeProtocol, \
-    DisposableProtocol, ScopeProtocol, CallableProtocol
+from .protocols import ClassProtocol, TypeProtocol, ObjectProtocol, SetterProtocol, GetterProtocol, BindProtocol, CallableTypeProtocol, ScopeProtocol, CallableProtocol
 from ..utils import SingletonMeta
 
 __all__ = [
@@ -404,16 +403,16 @@ class OverloadGroup(CallableAndBindProtocol):
 
         return overloads[0].call(args, kwargs)
 
-    def bind(self, args: list[ObjectProtocol]):
+    def bind(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
         result = []
         for overload in self.overloads:
             if not isinstance(overload, BindProtocol):
                 continue
             try:
-                result.append(overload.bind(args))
+                result.append(overload.bind(args, kwargs))
             except TypeError:
                 result.append(overload)
-        return OverloadGroup(self.parent.bind(args) if self.parent else None, *result)
+        return OverloadGroup(self.parent.bind(args, kwargs) if self.parent else None, *result)
 
     def build(self):
         # self.runtime_type =
@@ -715,11 +714,11 @@ class Scope(ScopeProtocol):
             raise NameNotFoundError(name, self)
         return self.parent.get_name(name)
 
-    def define(self, name: str, value):
+    def define(self, name: str, value, type=None):
         self._items[name] = value
         self._members[name] = value
 
-    def refer(self, name: str, value):
+    def refer(self, name: str, value, type=None):
         self._items[name] = value
 
     def all(self) -> list[tuple[str, ObjectProtocol]]:
@@ -741,10 +740,10 @@ class ObjectImpl:
                 raise TypeError
             if not isinstance(result, BindProtocol):
                 return result.call([self, *args], kwargs)
-            return result.bind([self]).call(args)
+            return result.bind([self], {}).call(args, kwargs)
 
 
-class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
+class Class(ClassProtocol, ScopeProtocol):
     class _Instance(ObjectProtocol):
         data: dict[str, ObjectProtocol]
         runtime_type: "Class"
@@ -845,7 +844,9 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
                     if isinstance(result, SetterProtocol):
                         result.set(value)
 
-        def bind(self, args: list[ObjectProtocol]):
+        def bind(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
+            assert not kwargs
+
             if self.is_static:
                 return self.owner.data[self.name]
             if not args:
@@ -870,25 +871,26 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
             return self.original.runtime_type
 
         def call(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
-            return self.bind(args).call([], kwargs)
+            return self.bind(args, kwargs).call([], {})
 
-        def bind(self, args: list[ObjectProtocol]):
+        def bind(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
             if self.is_static:
-                return self.original.bind(args)
+                return self.original.bind(args, kwargs)
             if not args:
                 return self
             instance = args[0]
             if self.is_instance:
                 if isinstance(instance, Class) and instance.is_subclass_of(self.owner):
                     return self
-                if not instance.is_instance_of(self.owner):
+                if instance.is_instance_of(self.owner) or isinstance(self.owner, TypeClassImplementation) and instance.is_instance_of(self.owner.implemented_type):
+                    return self.original.bind(args, kwargs)
+                else:
                     raise TypeError(f"Can only bind method '{self.owner}.{self.name}' to an instance of the owning class '{self.owner}'")
-                return self.original.bind(args)
             if instance.is_instance_of(self.owner):
                 instance = instance.runtime_type
             if not isinstance(instance, Class) or not instance.is_subclass_of(self.owner):
                 raise TypeError(f"Can only bind class method '{self.owner}.{self.name}' to subclasses of {self.owner}")
-            return self.original.bind(args)
+            return self.original.bind(args, kwargs)
 
     name: str | None
     base: ClassProtocol | None
@@ -916,9 +918,9 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
 
         self._instance_factory = self._Instance
 
-    def create_instance(self, args: list[ObjectProtocol]) -> ObjectProtocol:
+    def create_instance(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]) -> ObjectProtocol:
         instance = self._instance_factory(self)
-        result = self.constructor.call([instance, *args])
+        result = self.constructor.call([instance, *args], kwargs)
         return result if result != Unit.Instance else instance
 
     def get_base(self) -> "ClassProtocol":
@@ -934,7 +936,8 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
     def all(self) -> list[tuple[str, ObjectProtocol]]:
         return self._scope.all()
 
-    def define(self, name: str, value: ObjectProtocol):
+    def define(self, name: str, value: ObjectProtocol, type: TypeProtocol = None):
+        type = type or value.runtime_type
         match value:
             case Function() as function:
                 if name == self.name:
@@ -954,7 +957,7 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
     def delete(self, name: str):
         raise TypeError(f"You may not delete values from a class")
 
-    def dispose(self):
+    def on_exit(self):
         if not self.constructor.overloads:
             constructor = Function(self.name, Unit, None, [])
             constructor.signature.define_parameter("this", self)
@@ -969,6 +972,10 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
                 break
 
         self._instance_factory = type(self.name or "{Anonymous}", tuple(bases), {})
+
+    def on_typeclass_implementation(self, tc: "TypeClass", impl: "TypeClassImplementation"):
+        for name, item in impl.all():
+            self.define(name, item)
 
     # OOP Class Stuff
 
@@ -993,7 +1000,7 @@ class Class(ClassProtocol, ScopeProtocol, DisposableProtocol):
     # End OOP Class Stuff
 
     def __repr__(self):
-        return f"<Z# Class {self.name if self.name else '{Anonymous}'}>"
+        return f"<Z# Class {self.name}>" if self.name else "<{Anonymous} Z# Class>"
 
 
 class _ClassType(Class, CallableTypeProtocol, metaclass=SingletonMeta):
@@ -1085,11 +1092,16 @@ class TypeClass(Class):
             raise TypeError(f"type '{type}' already implements '{self}'")
         self._implementations[type] = self._TypeClassImplementationInfo(type, implementation, self)
 
+        try:
+            type.on_typeclass_implementation(self, implementation)
+        except (AttributeError, TypeError):
+            ...
+
     def get_implementation(self, type: TypeProtocol) -> "TypeClassImplementation":
         return self._implementations[type].implementation
 
     def __repr__(self):
-        return f"<Z# TypeClass {self.name}>"
+        return f"<Z# TypeClass {self.name}>" if self.name else "<{Anonymous} Z# TypeClass>"
 
 
 class TypeClassImplementation(Class):
@@ -1112,14 +1124,14 @@ class TypeClassImplementation(Class):
         _ = [*map(_bind_to_implemented_type, self._scope.members.mapping.values())]
 
 
-class ModuleType(ScopeProtocol):
+class ModuleType(TypeProtocol, ScopeProtocol):
     def get_name(self, name: str, instance: "Module" = None, **_) -> ObjectProtocol:
         if not isinstance(instance, Module):
             raise TypeError
         return instance.get_name(name, instance=instance, **_)
 
 
-class Module(ObjectProtocol, ScopeProtocol, DisposableProtocol):
+class Module(ObjectProtocol, ScopeProtocol):
     """
     A class that represents a Z# module.
     """
@@ -1148,7 +1160,7 @@ class Module(ObjectProtocol, ScopeProtocol, DisposableProtocol):
     def all(self) -> list[tuple[str, ObjectProtocol]]:
         return self._scope.all()
 
-    def dispose(self):
+    def on_exit(self):
         ...
 
     def __repr__(self):

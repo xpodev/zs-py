@@ -88,12 +88,12 @@ class ScopeProtocol:
         Returns a list of pairs of (name, value) of all values defined in this scope.
         """
 
-    def define(self, name: str, value: ObjectProtocol):
+    def define(self, name: str, value: ObjectProtocol, type: TypeProtocol = None):
         """
         Define a new value in this scope.
         """
 
-    def refer(self, name: str, value: ObjectProtocol):
+    def refer(self, name: str, value: ObjectProtocol, type: TypeProtocol = None):
         """
         Bind a name to a value from an external source in this scope.
         """
@@ -104,6 +104,11 @@ class ScopeProtocol:
 
         :raises NameNotFoundError: if the name could not be found.
         :raises TypeError: if this scope does not support deleting items.
+        """
+
+    def on_exit(self):
+        """
+        Called when the scope object is exited (i.e. end of scope)
         """
 
 
@@ -140,7 +145,7 @@ class ClassProtocol(TypeProtocol, ScopeProtocol, CallableProtocol):
 
 
 class BindProtocol:
-    def bind(self, args: list[ObjectProtocol]):
+    def bind(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
         """
         Returns an object that's bound to the given arguments.
         """
@@ -163,15 +168,4 @@ class CallableTypeProtocol(TypeProtocol):
         Returns the result type when called with the given types.
 
         :raises TypeError: if the types given do not match this callable's type.
-        """
-
-
-class DisposableProtocol:
-    """
-    Represents objects that need to take some actions once they are disposed of.
-    """
-
-    def dispose(self):
-        """
-        Dispose of this object. This method should be implemented in subclasses to do finalization code.
         """

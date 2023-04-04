@@ -133,7 +133,7 @@ class NativeFunction(CallableAndBindProtocol):
     def invoke(self, *args, **kwargs):
         return self._native(*args, **kwargs)
 
-    def bind(self, args: list[ObjectProtocol]):
+    def bind(self, args: list[ObjectProtocol], kwargs: dict[str, ObjectProtocol]):
         if isinstance(self._native, staticmethod):
             return self
         if len(args) > len(self.runtime_type.parameters):
@@ -141,7 +141,7 @@ class NativeFunction(CallableAndBindProtocol):
         for arg, parameter in zip(args, self.runtime_type.parameters):
             if not arg.is_instance_of(parameter):
                 raise TypeError(f"Can't assign argument of type {arg.runtime_type} to parameter of type {parameter}")
-        return NativeFunction(partial(self._native, *args), FunctionType(self.runtime_type.parameters[len(args):], self.runtime_type.returns))
+        return NativeFunction(partial(self._native, *args, **kwargs), FunctionType(self.runtime_type.parameters[len(args):], self.runtime_type.returns))
 
     def __call__(self, *args, **kwargs):
         return self.invoke(*args, **kwargs)
