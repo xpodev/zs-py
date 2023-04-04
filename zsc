@@ -1,5 +1,0 @@
-@ECHO OFF
-
-SET PYTHONPATH="%-dp0\src\"
-
-py zsc.py %-0
