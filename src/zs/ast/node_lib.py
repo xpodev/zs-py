@@ -196,6 +196,8 @@ class FunctionCall(Expression[token_info.FunctionCall]):
 
     callable: Expression
     arguments: list[Expression]
+    keyword_arguments: dict[str, Expression]
+    operator: str
 
     def __init__(
             self,
@@ -207,6 +209,13 @@ class FunctionCall(Expression[token_info.FunctionCall]):
         super().__init__(token_info.FunctionCall(_left_parenthesis, _right_parenthesis))
         self.callable = callable_
         self.arguments = arguments
+        self.keyword_arguments = {}
+        if _left_parenthesis == '(' and _right_parenthesis == ')':
+            self.operator = "()"
+        elif _left_parenthesis == '{' and _right_parenthesis == '}':
+            self.operator = "{}"
+        else:
+            raise ValueError("Call operator must be either () or {}")
 
 
 class Identifier(Expression[token_info.Identifier]):

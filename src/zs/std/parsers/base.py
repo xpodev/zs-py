@@ -554,6 +554,22 @@ def parse_function_call(parser: Parser, left: Expression) -> FunctionCall:
     return FunctionCall(left, _left_parenthesis, arguments, _right_parenthesis)
 
 
+def parse_partial_call(parser: Parser, left: Expression) -> FunctionCall:
+    _left_parenthesis = parser.eat('{')
+
+    arguments = []
+
+    while not parser.token('}'):
+        arguments.append(parser.next("Expression"))
+
+        if not parser.token(',', eat=True):
+            break
+
+    _right_parenthesis = parser.eat('}')
+
+    return FunctionCall(left, _left_parenthesis, arguments, _right_parenthesis)
+
+
 def parse_member_access(parser: Parser, left: Expression) -> MemberAccess:
     _dot = parser.eat('.')
 
