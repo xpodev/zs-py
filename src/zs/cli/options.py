@@ -50,7 +50,7 @@ class InitOptions:
     _project_name: str | None
     _source_directory: bool
 
-    def __init__(self, name: str | None, src: bool):
+    def __init__(self, name: str | None, src: bool = True):
         self._project_name = name
         self._source_directory = src
 
@@ -64,7 +64,7 @@ class InitOptions:
 
     @classmethod
     def from_args(cls, ns, _):
-        return cls(ns.project_name, ns.src or True)  # todo: fix cyclic import causing stack overflow exception
+        return cls(ns.project_name)
 
 
 _sub_parsers = _arg_parser.add_subparsers()
@@ -82,7 +82,7 @@ _init_project_parser.set_defaults(constructor=InitOptions.from_args, project_nam
 
 _new_project_parser = _sub_parsers.add_parser("new")
 _new_project_parser.add_argument("project_name")
-_new_project_parser.add_argument("--src", action="store_true")
+# _new_project_parser.add_argument("--src", action="store_true")
 _new_project_parser.set_defaults(constructor=InitOptions.from_args)
 
 

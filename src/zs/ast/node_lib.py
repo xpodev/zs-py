@@ -196,6 +196,8 @@ class FunctionCall(Expression[token_info.FunctionCall]):
 
     callable: Expression
     arguments: list[Expression]
+    keyword_arguments: dict[str, Expression]
+    operator: str
 
     def __init__(
             self,
@@ -207,6 +209,13 @@ class FunctionCall(Expression[token_info.FunctionCall]):
         super().__init__(token_info.FunctionCall(_left_parenthesis, _right_parenthesis))
         self.callable = callable_
         self.arguments = arguments
+        self.keyword_arguments = {}
+        if _left_parenthesis == '(' and _right_parenthesis == ')':
+            self.operator = "()"
+        elif _left_parenthesis == '{' and _right_parenthesis == '}':
+            self.operator = "{}"
+        else:
+            raise ValueError("Call operator must be either () or {}")
 
 
 class Identifier(Expression[token_info.Identifier]):
@@ -342,7 +351,7 @@ class Module(Node[token_info.Module]):
             _semicolon: Token = None
     ):
         super().__init__(token_info.Module(_module, _left_bracket, _right_bracket, _semicolon))
-        self.name = name.name
+        self.name = name.name if name is not None else None
         self.items = items if items is not None else items
 
 
@@ -370,11 +379,28 @@ class Return(Node[token_info.Return]):
         self.expression = expression
 
 
+class Set(Node[token_info.Set]):
+    name: Identifier
+    expression: Expression
+
+    def __init__(
+            self,
+            _set: Token,
+            name: Identifier,
+            _equals: Token,
+            expression: Expression,
+            _semicolon: Token
+    ):
+        super().__init__(token_info.Set(_set, _equals, _semicolon))
+        self.name = name
+        self.expression = expression
+
+
 class Tuple(Expression[token_info.Tuple]):
     """
     AST node for a tuple
 
-    '(' EXPRESSIONS ')'
+    '(' EXPRESSIONS, ... ')'
     """
 
     items: list[Expression]

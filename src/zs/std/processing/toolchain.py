@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import zs.ctrt
-from zs.ctrt.objects import Scope
+from zs.ctrt.core import Module, ExportScope, Scope
 from zs.ctrt.runtime import Interpreter
 from zs.processing import StatefulProcessor, State
 from zs.std.objects.compilation_environment import ContextManager
@@ -67,7 +67,7 @@ class Toolchain(StatefulProcessor):
 
             with self.interpreter.new_context():
 
-                with self.interpreter.x.scope() as export_scope, self.interpreter.x.scope():
+                with self.interpreter.x.scope(ExportScope(self.interpreter.x.global_scope)) as export_scope, self.interpreter.x.scope():
 
                     self.interpreter.run()
 
@@ -85,5 +85,11 @@ class Toolchain(StatefulProcessor):
                         raise e
 
                 self._context.add_scope_to_cache(info.path_string, export_scope)
+
+                for name, item in export_scope.all():
+                    if not name:
+                        raise ValueError(f"Unnamed object {item} was exported")
+                    if isinstance(item, Module):
+                        self._context.add_module_to_cache(name, item)
 
         return export_scope

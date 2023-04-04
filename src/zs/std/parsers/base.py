@@ -3,7 +3,7 @@ from typing import Callable, TypeVar, Any
 
 from zs.ast.node import Node
 from zs.ast.node_lib import Function, Class, If, Expression, Binary, ExpressionStatement, Identifier, Literal, Module, Import, Alias, TypedName, FunctionCall, MemberAccess, Block, Return, While, \
-    Continue, Break, When, Var, TypeClass, TypeClassImplementation, Assign, Export
+    Continue, Break, When, Var, TypeClass, TypeClassImplementation, Assign, Export, Set
 from zs.processing import State
 from zs.std.parsers.misc import subparser, copy_with
 from zs.text.errors import ParseError
@@ -45,6 +45,14 @@ def _identifier(parser: Parser):
 def _string(parser: Parser):
     if parser.token(TokenType.String):
         return Literal(parser.eat(TokenType.String))
+    raise ParseError
+
+
+@subparser(TokenType.Character)
+@_with_default
+def _char(parser: Parser):
+    if parser.token(TokenType.Character):
+        return Literal(parser.eat(TokenType.Character))
     raise ParseError
 
 
@@ -189,6 +197,30 @@ def parse_block(parser: Parser) -> Block:
     return Block(_left_bracket, statements, _right_bracket)
 
 
+@subparser('(')
+def parse_parenthesised_expression_or_tuple(parser: Parser) -> Expression:
+    _left_parenthesis = parser.eat('(')
+
+    expressions = []
+
+    is_tuple = False
+    while not parser.token(')'):
+        expressions.append(parser.next("Expression"))
+
+        if parser.token(',', eat=True):
+            is_tuple = True
+
+    _right_parenthesis = parser.eat(')')
+
+    if is_tuple:
+        raise ValueError("Tuples are not yet supported")
+    else:
+        if len(expressions) != 1:
+            raise ValueError("???")
+
+        return expressions[0]
+
+
 # statements
 
 
@@ -199,6 +231,7 @@ def parse_export(parser: Parser) -> Export:
     _l_curly = _r_curly = None
 
     source = True
+    _from = _semicolon = None
     if parser.token('*'):
         exported_items = Identifier(parser.eat('*'))
         if parser.token("as"):
@@ -232,16 +265,20 @@ def parse_export(parser: Parser) -> Export:
 
         if parser.token("as"):
             exported_items = Alias(exported_items, parser.eat("as"), _identifier(parser))
+            _semicolon = parser.eat(';')
 
         source = None
 
-    _from = _semicolon = None
     if source:
         _from = parser.eat("from")
 
-        source = parser.next("Expression")
+        source = _one_of(
+            parse_import,
+            _next("ExpressionStatement")
+        )(parser)
 
-        _semicolon = parser.eat(';')
+        # _semicolon = parser.eat(';')
+        _semicolon = None
 
     return Export(keyword, _l_curly, exported_items, _r_curly, _from, source, _semicolon)
 
@@ -390,17 +427,19 @@ def parse_class(parser: Parser) -> Class:
 def parse_module(parser: Parser) -> Module:
     keyword = parser.eat("module")
 
-    name = _identifier(parser)
+    name = _identifier(parser, default=None)
 
+    items = []
     if parser.token(';'):
         _semicolon = parser.eat(';')
         _left_bracket = _right_bracket = None
-        items = []
     else:
         _semicolon = None
         _left_bracket = parser.eat('{')
 
-        items = _many(_next("Document"))
+        # items = _many(_next("Document"))(parser)
+        while not parser.token('}'):
+            items.append(parser.next("Document"))
 
         _right_bracket = parser.eat('}')
 
@@ -412,6 +451,21 @@ def parse_module(parser: Parser) -> Module:
         _right_bracket,
         _semicolon
     )
+
+
+@subparser("set")
+def parse_set(parser: Parser) -> Set:
+    keyword = parser.eat("set")
+
+    name = _identifier(parser)
+
+    _equals = parser.eat('=')
+
+    expression = parser.next("Expression")
+
+    _semicolon = parser.eat(';')
+
+    return Set(keyword, name, _equals, expression, _semicolon)
 
 
 @subparser("typeclass")
@@ -496,6 +550,22 @@ def parse_function_call(parser: Parser, left: Expression) -> FunctionCall:
             break
 
     _right_parenthesis = parser.eat(')')
+
+    return FunctionCall(left, _left_parenthesis, arguments, _right_parenthesis)
+
+
+def parse_partial_call(parser: Parser, left: Expression) -> FunctionCall:
+    _left_parenthesis = parser.eat('{')
+
+    arguments = []
+
+    while not parser.token('}'):
+        arguments.append(parser.next("Expression"))
+
+        if not parser.token(',', eat=True):
+            break
+
+    _right_parenthesis = parser.eat('}')
 
     return FunctionCall(left, _left_parenthesis, arguments, _right_parenthesis)
 
@@ -667,19 +737,21 @@ class ExpressionParser(ContextualParser[Expression]):
     def __init__(self, state: State):
         super().__init__(state, "Expression")
 
+        self.add_parser(copy_with(_char, binding_power=0))
         self.add_parser(copy_with(_string, binding_power=0))
         self.add_parser(copy_with(_identifier, binding_power=0))
         self.add_parser(copy_with(_decimal, binding_power=0))
         self.add_parser(copy_with(_real, binding_power=0))
 
         self.add_parser(SubParser(
-            100, '(', led=parse_function_call
+            100, '(', led=parse_function_call, nud=parse_parenthesised_expression_or_tuple
         ))
         self.add_parser(SubParser(
             120, '.', led=parse_member_access
         ))
 
         self.add_parser(copy_with(parse_function, binding_power=0))
+        self.add_parser(copy_with(parse_module, binding_power=0))
         self.add_parser(copy_with(parse_class, binding_power=0))
         self.add_parser(copy_with(parse_type_class, binding_power=0))
 
@@ -801,6 +873,7 @@ def get_parser(state: State):
         parse_function,
         parse_class,
         parse_module,
+        parse_set,
         parse_type_class,
         parse_var,
 

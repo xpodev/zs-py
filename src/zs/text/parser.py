@@ -166,7 +166,7 @@ class ContextualParser(StatefulProcessor, Generic[_T]):
         if sub is None:
             sub = self._on_unknown_token(token)
         if sub is None:
-            self.state.error(f"Could not parse token: {token}")
+            self.state.error(f"Could not parse token: {token}", token)
         return sub
 
     def _on_unknown_token(self, token: Token):
@@ -291,7 +291,7 @@ class Parser(StatefulProcessor):
         try:
             return self.get(name).parse(self, binding_power)
         except KeyError:
-            self.state.error(f"Unknown parser \"{name}\" was invoked")
+            self.state.error(f"Unknown parser \"{name}\" was invoked", name)
 
     @overload
     def token(self) -> Token:
