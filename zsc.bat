@@ -1,5 +1,5 @@
 rem @ECHO OFF
 
-SET PYTHONPATH="%-dp0\src\"
+set PYTHONPATH=%PYTHONPATH%;%~dp0src\
 
-py "%-dp0\zs_main.py" %-0%
+py "%~dp0zs_main.py" c %1
